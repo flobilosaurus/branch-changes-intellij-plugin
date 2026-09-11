@@ -1,0 +1,21 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Kotlin
+.kotlin/
+
+# IntelliJ Platform plugin build/cache
+.idea-sandbox/
+.intellijPlatform/
+
+# OS
+.DS_Store

@@ -1,0 +1,37 @@
+<idea-plugin>
+    <id>com.github.flobilosaurus.branchchanges</id>
+    <name>Branch Changes</name>
+    <vendor url="https://github.com/flobilosaurus">flobilosaurus</vendor>
+
+    <description><![CDATA[
+        Highlights editor lines changed since the fork point with an explicitly selected branch base.
+        Base mappings stay project-local and all Git operations remain local and read-only.
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <p>Initial development release: branch-specific base selection and project controls.</p>
+    ]]></change-notes>
+
+    <idea-version since-build="243" until-build="262.*"/>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.vcs</depends>
+    <depends>Git4Idea</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <postStartupActivity implementation="com.github.flobilosaurus.branchchanges.BranchChangesProjectActivity"/>
+        <statusBarWidgetFactory id="BranchChanges"
+                                implementation="com.github.flobilosaurus.branchchanges.ui.BranchChangesStatusBarWidgetFactory"/>
+        <editorNotificationProvider implementation="com.github.flobilosaurus.branchchanges.ui.BranchBaseEditorNotificationProvider"/>
+    </extensions>
+
+    <applicationListeners>
+        <listener class="com.github.flobilosaurus.branchchanges.editor.BranchEditorFactoryListener"
+                  topic="com.intellij.openapi.editor.event.EditorFactoryListener"/>
+    </applicationListeners>
+
+    <projectListeners>
+        <listener class="com.github.flobilosaurus.branchchanges.editor.BranchFileEditorManagerListener"
+                  topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+    </projectListeners>
+</idea-plugin>
