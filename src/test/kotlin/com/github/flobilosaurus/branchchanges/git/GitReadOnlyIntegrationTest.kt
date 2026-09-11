@@ -6,6 +6,7 @@ import git4idea.commands.Git
 import git4idea.commands.GitLineHandler
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Proxy
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
@@ -47,6 +48,30 @@ class GitReadOnlyIntegrationTest : GitPlatformTestCase() {
         assertEquals(before, snapshot(fixture.root.path))
     }
 
+    fun testComparisonAndRenameOperationsLeaveRepositoryUnchanged() {
+        val fixture = createGitRoot("repo")
+        git(fixture.root, "checkout", "-b", "feature")
+        git(fixture.root, "mv", "readme.txt", "renamed.txt")
+        val repository = registerGitRoots(fixture.root).single()
+        val before = snapshot(fixture.root.path)
+        val client = BranchGitClient(project)
+
+        val identity = PlatformTestUtil.callOnBgtSynchronously(
+            { client.capture(repository, "refs/heads/main") },
+            10,
+        ) as GitOperationResult.Success
+        PlatformTestUtil.callOnBgtSynchronously(
+            { client.loadNameStatus(repository, identity.value.forkHash) },
+            10,
+        )
+        PlatformTestUtil.callOnBgtSynchronously(
+            { client.loadBaseline(repository, identity.value.forkHash, "readme.txt", StandardCharsets.UTF_8) },
+            10,
+        )
+
+        assertEquals(before, snapshot(fixture.root.path))
+    }
+
     private fun spyingGit(commands: MutableList<String>): Git {
         val delegate = Git.getInstance()
         return Proxy.newProxyInstance(
@@ -75,7 +100,7 @@ class GitReadOnlyIntegrationTest : GitPlatformTestCase() {
         return RepositorySnapshot(
             refs = gitText(root, "show-ref"),
             indexHash = sha256(Files.readAllBytes(indexPath)),
-            worktreeHash = sha256(Files.readAllBytes(rootPath.resolve("readme.txt"))),
+            worktreeHash = worktreeHash(rootPath),
             objectCount = gitText(root, "count-objects", "-v"),
             status = gitText(root, "status", "--porcelain=v2", "--branch"),
             untracked = gitText(root, "ls-files", "--others", "--exclude-standard"),
@@ -90,6 +115,19 @@ class GitReadOnlyIntegrationTest : GitPlatformTestCase() {
         val stderr = process.errorStream.bufferedReader().readText()
         check(process.waitFor() == 0) { stderr }
         return stdout
+    }
+
+    private fun worktreeHash(root: Path): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        Files.walk(root).use { paths ->
+            paths.filter { Files.isRegularFile(it) && !it.startsWith(root.resolve(".git")) }
+                .sorted()
+                .forEach {
+                    digest.update(root.relativize(it).toString().toByteArray())
+                    digest.update(Files.readAllBytes(it))
+                }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")

@@ -4,12 +4,15 @@
     <vendor url="https://github.com/flobilosaurus">flobilosaurus</vendor>
 
     <description><![CDATA[
-        Highlights editor lines changed since the fork point with an explicitly selected branch base.
-        Base mappings stay project-local and all Git operations remain local and read-only.
+        Highlights added, modified, and deleted editor lines since the fork point with an explicitly selected branch base.
+        Includes committed, staged, unstaged, and unsaved changes, supports Git-detected committed/staged renames,
+        and opens fork-to-live full-file diffs from gutter markers. Base mappings stay workspace-local;
+        Git operations remain local, read-only, and never fetch.
     ]]></description>
 
     <change-notes><![CDATA[
-        <p>Initial development release: branch-specific base selection and project controls.</p>
+        <p>Initial MVP: branch-specific base selection, live fork-relative markers, rename-aware baselines,
+        full-file marker diff, project controls, theme-aware colors, and local-only read-only Git behavior.</p>
     ]]></change-notes>
 
     <idea-version since-build="243" until-build="262.*"/>
@@ -23,6 +26,7 @@
         <statusBarWidgetFactory id="BranchChanges"
                                 implementation="com.github.flobilosaurus.branchchanges.ui.BranchChangesStatusBarWidgetFactory"/>
         <editorNotificationProvider implementation="com.github.flobilosaurus.branchchanges.ui.BranchBaseEditorNotificationProvider"/>
+        <colorSettingsPage implementation="com.github.flobilosaurus.branchchanges.editor.BranchChangesColors"/>
     </extensions>
 
     <applicationListeners>

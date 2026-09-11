@@ -2,7 +2,7 @@
 
 Branch Changes is an IntelliJ IDEA plugin for branch-relative editor change highlighting. Each Git root and local branch gets an explicitly selected comparison base. This avoids guessing branch ancestry from Git metadata.
 
-> Development status: base selection, persistence, status widget, and setup notifications are implemented. Branch-relative editor markers are planned in the next implementation phase.
+> Development status: MVP base selection, live branch-relative markers, rename awareness, and marker-click full diff are implemented.
 
 ## Requirements
 
@@ -47,6 +47,43 @@ Status values:
 
 Open the widget popup to select/change the base or toggle Branch Changes for the whole project. Disabling hides setup notifications while preserving every saved mapping. Reenabling restores them.
 
+## Comparison and marker semantics
+
+Branch Changes resolves selected base and current `HEAD`, then requires exactly one best merge base. File text at that fork commit is compared directly with current live editor document. Results therefore include net committed, staged, unstaged, and unsaved changes since fork while staying aligned with visible editor lines.
+
+Marker legend:
+
+- **Added** — whole-line added background plus gutter stripe
+- **Modified** — whole-line modified background plus gutter stripe
+- **Deleted** — gutter triangle anchored before next live line or at EOF
+
+Colors use theme-aware IntelliJ diff defaults and can be changed under **Settings | Editor | Color Scheme | Branch Changes**. Tooltips identify change type, selected base, abbreviated fork commit, and local-edit scope. Click any added, modified, or deleted gutter marker to open full-file diff from fork-baseline content to current live document.
+
+Branch Changes markers coexist with IntelliJ built-in VCS gutter markers. Built-in markers remain `HEAD`-relative; Branch Changes markers are fork-relative.
+
+## Refresh and performance limits
+
+Open/close, live document edits, branch or local ref updates, base changes, project toggle changes, VFS moves/renames, and color-scheme changes trigger debounced recomputation. Rapid edits supersede stale work. Git and line comparison run outside UI thread.
+
+Highlighting is skipped, with non-modal status, for:
+
+- binary or ignored files
+- files larger than 2 MiB
+- documents over 10,000 lines
+- detached or unborn `HEAD`
+- missing/invalid base refs
+- histories with no merge base or multiple best merge bases
+- missing partial-clone objects when lazy fetching is disabled
+- malformed Git output or differences too large for IntelliJ diff engine
+
+Disable project highlighting from status widget to remove Branch Changes markers immediately. Saved branch/root mappings remain and highlighting recomputes after reenabling.
+
+## Rename behavior
+
+Committed and staged renames detected by Git between fork commit and current index use Git's native default similarity threshold. Pure detected renames show no changed-line markers. Detected rename-plus-edit files show only net edited regions. Lower-similarity delete/add results use new-file behavior for destination.
+
+Unstaged filesystem moves are not paired with deleted source paths: destination is treated as new until rename is staged. This is intentional MVP limitation.
+
 ## Local-only ref freshness and safety
 
 Branch Changes only reads refs and objects already present locally. It never fetches or contacts remotes. Run `git fetch` yourself when you want fresher remote-tracking refs, then the plugin reacts to the local repository update.
@@ -76,9 +113,9 @@ Launch sandbox IntelliJ IDEA 2024.3:
 
 Build uses Kotlin, Java 21, Gradle Kotlin DSL, IntelliJ Platform Gradle Plugin 2.x, and bundled `Git4Idea` APIs.
 
-## Current unavailable states
+## Troubleshooting unavailable states
 
-Configuration UI remains inactive for non-Git files, detached HEAD, unborn branches, and repositories without a current local branch. Missing saved refs appear as unavailable and can be replaced through **Select base...**.
+Configuration UI remains inactive for non-Git files, detached HEAD, unborn branches, and repositories without a current local branch. Missing saved refs appear unavailable and can be replaced through **Select base...**. Fetch stale refs manually, then wait for repository refresh. Binary, ignored, oversized, excessive-line, ambiguous-history, and Git failure states appear as editor notifications or status-widget tooltips without repeated dialogs. Git command failures are available in IDE log; file contents are not logged.
 
 ## Non-goals
 

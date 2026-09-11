@@ -1,8 +1,8 @@
 package com.github.flobilosaurus.branchchanges.ui
 
 import com.github.flobilosaurus.branchchanges.BranchChangesBundle
-import com.github.flobilosaurus.branchchanges.git.BranchContextResolver
 import com.github.flobilosaurus.branchchanges.git.BranchRefProvider
+import com.github.flobilosaurus.branchchanges.model.BranchContext
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.diagnostic.Logger
@@ -33,7 +33,7 @@ class BranchBaseChooser(
 ) {
     private val log = Logger.getInstance(BranchBaseChooser::class.java)
     fun choose(
-        context: BranchContextResolver.Context,
+        context: BranchContext,
         onSelected: (BranchRefProvider.Validation.Valid) -> Unit,
     ) {
         coroutineScope.launch(Dispatchers.IO) {
@@ -57,7 +57,7 @@ class BranchBaseChooser(
     }
 
     private inner class BaseDialog(
-        private val context: BranchContextResolver.Context,
+        private val context: BranchContext,
         discovery: BranchRefProvider.Discovery,
     ) : DialogWrapper(project, true) {
         private val model = DefaultListModel<BranchRefProvider.Ref>()

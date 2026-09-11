@@ -1,5 +1,6 @@
 package com.github.flobilosaurus.branchchanges.git
 
+import com.github.flobilosaurus.branchchanges.model.BranchContext
 import com.github.flobilosaurus.branchchanges.settings.BranchBaseSettings
 import com.intellij.dvcs.repo.Repository
 import com.intellij.openapi.project.Project
@@ -13,17 +14,9 @@ class BranchContextResolver(
     private val repositoryManager: GitRepositoryManager = GitRepositoryManager.getInstance(project),
 ) {
     sealed interface Result {
-        data class Available(val context: Context) : Result
+        data class Available(val context: BranchContext) : Result
         data class Unavailable(val reason: UnavailableReason) : Result
     }
-
-    data class Context(
-        val repository: GitRepository,
-        val rootUrl: String,
-        val branchName: String,
-        val headHash: String,
-        val configuredBaseRef: String?,
-    )
 
     enum class UnavailableReason {
         NOT_GIT,
@@ -33,7 +26,10 @@ class BranchContextResolver(
     }
 
     fun resolve(file: VirtualFile): Result {
-        val repository = repositoryManager.getRepositoryForFileQuick(file)
+        val repository = repositoryManager.repositories
+            .asSequence()
+            .filter { com.intellij.openapi.vfs.VfsUtilCore.isAncestor(it.root, file, false) }
+            .maxByOrNull { it.root.path.length }
             ?: return Result.Unavailable(UnavailableReason.NOT_GIT)
 
         if (repository.state == Repository.State.DETACHED) {
@@ -47,9 +43,12 @@ class BranchContextResolver(
         val rootUrl = BranchBaseSettings.normalizeRootUrl(repository.root.url)
 
         return Result.Available(
-            Context(
+            BranchContext(
                 repository = repository,
                 rootUrl = rootUrl,
+                rootPath = repository.root.path,
+                relativePath = com.intellij.openapi.vfs.VfsUtilCore.getRelativePath(file, repository.root, '/')
+                    ?: return Result.Unavailable(UnavailableReason.NOT_GIT),
                 branchName = branch.name,
                 headHash = revision,
                 configuredBaseRef = settings.getBase(rootUrl, branch.name),

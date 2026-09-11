@@ -5,7 +5,7 @@ branch: ""
 repository: branch-changes-intellij-plugin
 topic: "Branch-relative editor change highlighting"
 tags: [plan, intellij-plugin, git, editor, highlighting]
-status: draft
+status: completed
 ---
 
 # PLAN: Branch-Relative Editor Change Highlighting
@@ -18,62 +18,62 @@ Repository is currently empty and is not initialized as a Git repository. Plan t
 
 ### Plugin and compatibility
 
-- [ ] Plugin uses display name `Branch Changes`, plugin ID/package namespace `com.github.flobilosaurus.branchchanges`, Kotlin, Gradle Kotlin DSL, and IntelliJ Platform Gradle Plugin 2.x.
-- [ ] Plugin declares IntelliJ IDEA Community and Ultimate 2024.3 as minimum, records latest stable release validated during implementation as maximum supported release, and declares bundled `Git4Idea` dependency; later releases remain best-effort until verified.
-- [ ] Build produces locally installable plugin ZIP without requiring publishing or signing credentials.
-- [ ] Plugin Verifier reports no compatibility problems for IDEA 2024.3 and recorded maximum supported Community/Ultimate releases.
+- [x] Plugin uses display name `Branch Changes`, plugin ID/package namespace `com.github.flobilosaurus.branchchanges`, Kotlin, Gradle Kotlin DSL, and IntelliJ Platform Gradle Plugin 2.x.
+- [x] Plugin declares IntelliJ IDEA Community and Ultimate 2024.3 as minimum, records latest stable release validated during implementation as maximum supported release, and declares bundled `Git4Idea` dependency; later releases remain best-effort until verified.
+- [x] Build produces locally installable plugin ZIP without requiring publishing or signing credentials.
+- [x] Plugin Verifier reports no compatibility problems for IDEA 2024.3 and recorded maximum supported Community/Ultimate releases.
 
 ### Base selection and persistence
 
-- [ ] Plugin stores one explicit base-ref mapping per `(Git root, current local branch)` in workspace-local IntelliJ state.
-- [ ] First encounter with an unconfigured branch shows an editor notification containing a `Select base` action.
-- [ ] Base picker suggests remote default branch when locally known, but requires explicit user confirmation and never selects silently.
-- [ ] Base picker lists locally known local and remote refs, validates selected ref, and rejects only current local branch ref itself; distinct refs sharing same tip remain valid.
-- [ ] Multi-root projects resolve and persist base mappings independently.
-- [ ] Status-bar widget shows current editor's selected base or a clear `Select base`, `Disabled`, or `Unavailable` state.
-- [ ] Status-bar popup allows changing base and toggling highlighting for whole project while preserving saved mappings.
-- [ ] Branch checkout restores that branch's mapping and refreshes all affected open editors.
-- [ ] Plugin never fetches remotes, disables partial-clone lazy object fetching for every Git command, and performs no Git operation that modifies object database, refs, index, or working tree.
+- [x] Plugin stores one explicit base-ref mapping per `(Git root, current local branch)` in workspace-local IntelliJ state.
+- [x] First encounter with an unconfigured branch shows an editor notification containing a `Select base` action.
+- [x] Base picker suggests remote default branch when locally known, but requires explicit user confirmation and never selects silently.
+- [x] Base picker lists locally known local and remote refs, validates selected ref, and rejects only current local branch ref itself; distinct refs sharing same tip remain valid.
+- [x] Multi-root projects resolve and persist base mappings independently.
+- [x] Status-bar widget shows current editor's selected base or a clear `Select base`, `Disabled`, or `Unavailable` state.
+- [x] Status-bar popup allows changing base and toggling highlighting for whole project while preserving saved mappings.
+- [x] Branch checkout restores that branch's mapping and refreshes all affected open editors.
+- [x] Plugin never fetches remotes, disables partial-clone lazy object fetching for every Git command, and performs no Git operation that modifies object database, refs, index, or working tree.
 
 ### Comparison semantics
 
-- [ ] Baseline commit is sole merge-base of captured selected base tip and captured current `HEAD`; histories with zero or multiple best merge-bases are reported unavailable rather than choosing arbitrarily.
-- [ ] Baseline file text is compared directly with current live `Document`, so results include committed, staged, unstaged, and unsaved net changes while remaining aligned with visible lines.
-- [ ] Added blocks are identified when baseline range is empty and current range is non-empty.
-- [ ] Modified blocks are identified when both baseline and current ranges are non-empty.
-- [ ] Deleted blocks are identified when current range is empty and retain an anchor at beginning, between lines, or EOF.
-- [ ] New and untracked non-ignored text files render every current line as added; empty new files produce no line marker.
-- [ ] Files Git detects as renames between merge-base and index at native default similarity threshold are mapped to their baseline path, covering committed and staged renames.
-- [ ] Pure committed/staged renames produce no changed-line markers; renamed-and-edited files detected above Git's similarity threshold show only net edited regions, while lower-similarity delete/add results follow new-file behavior.
-- [ ] Unstaged filesystem moves are treated as new files until staged, and this limitation is documented.
+- [x] Baseline commit is sole merge-base of captured selected base tip and captured current `HEAD`; histories with zero or multiple best merge-bases are reported unavailable rather than choosing arbitrarily.
+- [x] Baseline file text is compared directly with current live `Document`, so results include committed, staged, unstaged, and unsaved net changes while remaining aligned with visible lines.
+- [x] Added blocks are identified when baseline range is empty and current range is non-empty.
+- [x] Modified blocks are identified when both baseline and current ranges are non-empty.
+- [x] Deleted blocks are identified when current range is empty and retain an anchor at beginning, between lines, or EOF.
+- [x] New and untracked non-ignored text files render every current line as added; empty new files produce no line marker.
+- [x] Files Git detects as renames between merge-base and index at native default similarity threshold are mapped to their baseline path, covering committed and staged renames.
+- [x] Pure committed/staged renames produce no changed-line markers; renamed-and-edited files detected above Git's similarity threshold show only net edited regions, while lower-similarity delete/add results follow new-file behavior.
+- [x] Unstaged filesystem moves are treated as new files until staged, and this limitation is documented.
 
 ### Editor behavior and UX
 
-- [ ] Added, modified, and deleted regions use distinct, theme-aware, user-configurable color-scheme keys.
-- [ ] Added and modified regions render both subtle whole-line backgrounds and gutter stripes.
-- [ ] Deleted-only regions render gutter anchors because no current line exists to receive a background.
-- [ ] Gutter geometry scales with IDE UI scale and coexists with built-in VCS markers.
-- [ ] Marker tooltip states change type, selected base, fork commit abbreviation, and that comparison includes local edits.
-- [ ] Marker accessibility text communicates same essential information as tooltip.
-- [ ] Clicking any gutter marker opens IntelliJ full-file diff from fork-baseline content to current live document.
-- [ ] Disabling project toggle immediately removes owned markers; reenabling recomputes them.
-- [ ] Plugin removes only highlighters it owns and clears them when editor, file, project, or plugin is disposed.
+- [x] Added, modified, and deleted regions use distinct, theme-aware, user-configurable color-scheme keys.
+- [x] Added and modified regions render both subtle whole-line backgrounds and gutter stripes.
+- [x] Deleted-only regions render gutter anchors because no current line exists to receive a background.
+- [x] Gutter geometry scales with IDE UI scale and coexists with built-in VCS markers.
+- [x] Marker tooltip states change type, selected base, fork commit abbreviation, and that comparison includes local edits.
+- [x] Marker accessibility text communicates same essential information as tooltip.
+- [x] Clicking any gutter marker opens IntelliJ full-file diff from fork-baseline content to current live document.
+- [x] Disabling project toggle immediately removes owned markers; reenabling recomputes them.
+- [x] Plugin removes only highlighters it owns and clears them when editor, file, project, or plugin is disposed.
 
 ### Refresh, performance, and failures
 
-- [ ] File open, document edit, branch/ref change, base change, and enable-state change trigger coalesced recomputation.
-- [ ] Git I/O and line comparison run off EDT; editor rendering runs on EDT.
-- [ ] Each result carries repository revision/base identity, read-only index fingerprint, normalized file path, document modification stamp, and generation; stale or cancelled results never replace current markers.
-- [ ] Rapid edits cancel or supersede prior work without UI freezes or marker flicker.
-- [ ] Plugin skips binary files, ignored files, files larger than 2 MiB, and documents over 10,000 lines with a non-modal explanatory state.
-- [ ] Detached HEAD, unborn branch, missing base ref, missing merge-base, unrelated history, malformed Git output, `DiffTooBigException`, and disposed/invalid editor state clear stale markers and remain recoverable.
-- [ ] Git failures are logged without file contents and surfaced through concise non-modal UI rather than repeated dialogs.
+- [x] File open, document edit, branch/ref change, base change, and enable-state change trigger coalesced recomputation.
+- [x] Git I/O and line comparison run off EDT; editor rendering runs on EDT.
+- [x] Each result carries repository revision/base identity, read-only index fingerprint, normalized file path, document modification stamp, and generation; stale or cancelled results never replace current markers.
+- [x] Rapid edits cancel or supersede prior work without UI freezes or marker flicker.
+- [x] Plugin skips binary files, ignored files, files larger than 2 MiB, and documents over 10,000 lines with a non-modal explanatory state.
+- [x] Detached HEAD, unborn branch, missing base ref, missing merge-base, unrelated history, malformed Git output, `DiffTooBigException`, and disposed/invalid editor state clear stale markers and remain recoverable.
+- [x] Git failures are logged without file contents and surfaced through concise non-modal UI rather than repeated dialogs.
 
 ### Documentation
 
-- [ ] README explains installation, first-use setup, status widget, colors, marker click behavior, project toggle, live-document semantics, and local-only base freshness.
-- [ ] README documents supported IDE versions, multi-root behavior, performance limits, staged/committed rename support, unstaged-rename limitation, and troubleshooting states.
-- [ ] Plugin description and change notes accurately describe MVP scope without promising Marketplace publication or Remote Development support.
+- [x] README explains installation, first-use setup, status widget, colors, marker click behavior, project toggle, live-document semantics, and local-only base freshness.
+- [x] README documents supported IDE versions, multi-root behavior, performance limits, staged/committed rename support, unstaged-rename limitation, and troubleshooting states.
+- [x] Plugin description and change notes accurately describe MVP scope without promising Marketplace publication or Remote Development support.
 
 ## Technical Key Decisions and Tradeoffs
 
@@ -336,10 +336,10 @@ Deliver an installable plugin whose status widget and editor notification resolv
 
 **Manual Verification**:
 
-- [ ] Launch `./gradlew runIde`, open Git project on unconfigured feature branch, and confirm notification plus `Select base` widget state appear without UI freeze or network/fetch activity.
-- [ ] Select suggested `origin/main`, confirm widget updates only after confirmation, restart sandbox IDE, and confirm mapping persists.
-- [ ] Switch between two branches and two Git roots with different mappings; confirm widget follows active editor/root/branch and restores correct selection.
-- [ ] Disable project highlighting from widget; confirm notification disappears and mapping remains after reenabling.
+- [x] Launch `./gradlew runIde`, open Git project on unconfigured feature branch, and confirm notification plus `Select base` widget state appear without UI freeze or network/fetch activity.
+- [x] Select suggested `origin/main`, confirm widget updates only after confirmation, restart sandbox IDE, and confirm mapping persists.
+- [x] Switch between two branches and two Git roots with different mappings; confirm widget follows active editor/root/branch and restores correct selection.
+- [x] Disable project highlighting from widget; confirm notification disappears and mapping remains after reenabling.
 
 ### Phase 2: Live Added, Modified, and Deleted Highlighting
 
@@ -349,43 +349,43 @@ Deliver core end-to-end feature for unchanged paths and new/untracked files: for
 
 **Tasks**:
 
-- [ ] Define immutable `model/BranchContext.kt`, `ComparisonSnapshot.kt`, and `BranchChangeRegion.kt` models containing normalized root/path, branch/base refs and captured hashes, document stamp/generation, baseline/current text metadata, half-open ranges, deletion anchors, and typed unavailable reasons.
-- [ ] Implement `git/BranchGitClient.kt` as only Git4Idea integration boundary for read-only ref resolution, merge-base, baseline blob loading, tracked/ignored checks, command cancellation, NUL-safe output, charset-aware decoding, and typed error mapping; inject `GIT_NO_LAZY_FETCH=1` and `GIT_TERMINAL_PROMPT=0` into every command.
-- [ ] Capture base tip, `HEAD` object ID, and SHA-256 fingerprint of repository's actual index file before merge-base/blob work; invoke all-result merge-base detection and continue only for exactly one best merge-base so one comparison generation never mixes moving-ref/index states or chooses an ambiguous baseline.
-- [ ] Normalize baseline line separators to `\n`, decode using current file charset when valid, detect NUL/binary content, and avoid logging content.
-- [ ] Implement direct baseline-path behavior: load merge-base blob at current repository-relative path when present; use empty baseline for new/untracked non-ignored text files; skip ignored files.
-- [ ] Implement 2 MiB and 10,000-line preflight guards before expensive comparison and map `DiffTooBigException` to typed unavailable state.
-- [ ] Implement `diff/BranchLineComparator.kt` with `ComparisonManager.compareLines()` and `ComparisonPolicy.DEFAULT`, mapping `LineFragment.startLine2/endLine2` into added/modified ranges and zero-width deleted anchors, including beginning/EOF boundaries and final-line-without-newline cases.
-- [ ] Expand `BranchChangesProjectService.kt` to register supported editors/documents, debounce rapid edits, maintain one cancellable computation/generation per `(Document, Git root, current branch, base ref)` context, run Git/diff work off EDT, and fan one validated result out to each editor displaying that document.
-- [ ] Retain highlighters per editor while maintaining reference-counted per-document listeners/computations so split editors refresh together without duplicate Git jobs or leaked listeners.
-- [ ] Before EDT apply, verify project/editor/file validity, normalized current file path, branch/base/hash identity, captured index fingerprint/generation, and document stamp; discard work when index changes during computation or before queued apply.
-- [ ] Subscribe refresh invalidation to file open/close, document change, VFS rename/move, Git repository/ref or index update, branch checkout, base mapping change, project toggle, color-scheme change, dynamic plugin unload, and project disposal.
-- [ ] Implement `editor/BranchChangesColors.kt` with configurable color-scheme descriptors and theme-aware defaults for added, modified, and deleted states; register its color settings extension in `plugin.xml` only after class exists, and avoid hard-coded final runtime colors.
-- [ ] Implement `editor/BranchHighlightRenderer.kt` to atomically replace only plugin-owned highlighters, use `LINES_IN_RANGE` backgrounds for added/modified blocks, and retain highlighter registry per editor.
-- [ ] Implement `editor/BranchGutterRenderer.kt` as accessible `ActiveGutterRenderer` with UI-scaled added/modified stripes and deletion triangles/anchors, robust beginning/EOF geometry, region tooltip, and placeholder click delegation for Phase 3.
-- [ ] Ensure project disable, unsupported state, invalid ref, branch change, editor release, and disposal cancel work and immediately clear only owned highlighters.
-- [ ] Surface skipped/error state through status widget tooltip or editor notification without repeated modal dialogs; preserve actionable `Select base` recovery for missing/invalid mappings.
-- [ ] Add `diff/BranchLineComparatorTest.kt` covering equal, insertion, replacement, unequal replacement, deletion at start/middle/EOF, empty/new file, blank lines, CRLF normalization, trailing newline, and large-diff cancellation.
-- [ ] Add `editor/BranchHighlightRendererTest.kt` covering color keys, line ranges, deletion anchors, tooltip/accessibility text, split editors, atomic replacement, coexistence with unrelated highlighters, toggle cleanup, and disposal.
-- [ ] Add service/platform tests using controllable fake Git adapter for debounce, cancellation, out-of-order completion, stale document stamp/path/index fingerprint, concurrent staging, VFS rename/move, branch/base changes, split-editor computation deduplication, unsupported states, dynamic unload cleanup, and no Git/diff work on EDT.
-- [ ] Add Git-backed integration tests for sole merge-base selection, unchanged/modified/new/untracked/ignored files, unsaved document edits, staged and unstaged changes, missing base, detached HEAD, unrelated history, synthetic criss-cross history with multiple best merge-bases, and partial-clone missing-object behavior with lazy fetch disabled.
-- [ ] Update README with fork-baseline/live-document semantics, visual legend, marker tooltip, interaction placeholder, refresh behavior, project toggle, limits, unsupported states, and distinction from IntelliJ's HEAD-relative VCS gutter.
+- [x] Define immutable `model/BranchContext.kt`, `ComparisonSnapshot.kt`, and `BranchChangeRegion.kt` models containing normalized root/path, branch/base refs and captured hashes, document stamp/generation, baseline/current text metadata, half-open ranges, deletion anchors, and typed unavailable reasons.
+- [x] Implement `git/BranchGitClient.kt` as only Git4Idea integration boundary for read-only ref resolution, merge-base, baseline blob loading, tracked/ignored checks, command cancellation, NUL-safe output, charset-aware decoding, and typed error mapping; inject `GIT_NO_LAZY_FETCH=1` and `GIT_TERMINAL_PROMPT=0` into every command.
+- [x] Capture base tip, `HEAD` object ID, and SHA-256 fingerprint of repository's actual index file before merge-base/blob work; invoke all-result merge-base detection and continue only for exactly one best merge-base so one comparison generation never mixes moving-ref/index states or chooses an ambiguous baseline.
+- [x] Normalize baseline line separators to `\n`, decode using current file charset when valid, detect NUL/binary content, and avoid logging content.
+- [x] Implement direct baseline-path behavior: load merge-base blob at current repository-relative path when present; use empty baseline for new/untracked non-ignored text files; skip ignored files.
+- [x] Implement 2 MiB and 10,000-line preflight guards before expensive comparison and map `DiffTooBigException` to typed unavailable state.
+- [x] Implement `diff/BranchLineComparator.kt` with `ComparisonManager.compareLines()` and `ComparisonPolicy.DEFAULT`, mapping `LineFragment.startLine2/endLine2` into added/modified ranges and zero-width deleted anchors, including beginning/EOF boundaries and final-line-without-newline cases.
+- [x] Expand `BranchChangesProjectService.kt` to register supported editors/documents, debounce rapid edits, maintain one cancellable computation/generation per `(Document, Git root, current branch, base ref)` context, run Git/diff work off EDT, and fan one validated result out to each editor displaying that document.
+- [x] Retain highlighters per editor while maintaining reference-counted per-document listeners/computations so split editors refresh together without duplicate Git jobs or leaked listeners.
+- [x] Before EDT apply, verify project/editor/file validity, normalized current file path, branch/base/hash identity, captured index fingerprint/generation, and document stamp; discard work when index changes during computation or before queued apply.
+- [x] Subscribe refresh invalidation to file open/close, document change, VFS rename/move, Git repository/ref or index update, branch checkout, base mapping change, project toggle, color-scheme change, dynamic plugin unload, and project disposal.
+- [x] Implement `editor/BranchChangesColors.kt` with configurable color-scheme descriptors and theme-aware defaults for added, modified, and deleted states; register its color settings extension in `plugin.xml` only after class exists, and avoid hard-coded final runtime colors.
+- [x] Implement `editor/BranchHighlightRenderer.kt` to atomically replace only plugin-owned highlighters, use `LINES_IN_RANGE` backgrounds for added/modified blocks, and retain highlighter registry per editor.
+- [x] Implement `editor/BranchGutterRenderer.kt` as accessible `ActiveGutterRenderer` with UI-scaled added/modified stripes and deletion triangles/anchors, robust beginning/EOF geometry, region tooltip, and placeholder click delegation for Phase 3.
+- [x] Ensure project disable, unsupported state, invalid ref, branch change, editor release, and disposal cancel work and immediately clear only owned highlighters.
+- [x] Surface skipped/error state through status widget tooltip or editor notification without repeated modal dialogs; preserve actionable `Select base` recovery for missing/invalid mappings.
+- [x] Add `diff/BranchLineComparatorTest.kt` covering equal, insertion, replacement, unequal replacement, deletion at start/middle/EOF, empty/new file, blank lines, CRLF normalization, trailing newline, and large-diff cancellation.
+- [x] Add `editor/BranchHighlightRendererTest.kt` covering color keys, line ranges, deletion anchors, tooltip/accessibility text, split editors, atomic replacement, coexistence with unrelated highlighters, toggle cleanup, and disposal.
+- [x] Add service/platform tests using controllable fake Git adapter for debounce, cancellation, out-of-order completion, stale document stamp/path/index fingerprint, concurrent staging, VFS rename/move, branch/base changes, split-editor computation deduplication, unsupported states, dynamic unload cleanup, and no Git/diff work on EDT.
+- [x] Add Git-backed integration tests for sole merge-base selection, unchanged/modified/new/untracked/ignored files, unsaved document edits, staged and unstaged changes, missing base, detached HEAD, unrelated history, synthetic criss-cross history with multiple best merge-bases, and partial-clone missing-object behavior with lazy fetch disabled.
+- [x] Update README with fork-baseline/live-document semantics, visual legend, marker tooltip, interaction placeholder, refresh behavior, project toggle, limits, unsupported states, and distinction from IntelliJ's HEAD-relative VCS gutter.
 
 **Automated Verification**:
 
-- [ ] `./gradlew test` passes pure comparator, renderer, service, and native-Git integration suites.
-- [ ] Threading tests/assertions confirm Git and comparison work do not execute on EDT and stale generations/path identities cannot install markers.
-- [ ] Highlighter ownership and dynamic-unload tests confirm plugin cleanup leaves unrelated editor highlighters untouched.
-- [ ] `./gradlew verifyPluginProjectConfiguration verifyPluginStructure buildPlugin` passes and produces updated ZIP.
+- [x] `./gradlew test` passes pure comparator, renderer, service, and native-Git integration suites.
+- [x] Threading tests/assertions confirm Git and comparison work do not execute on EDT and stale generations/path identities cannot install markers.
+- [x] Highlighter ownership and dynamic-unload tests confirm plugin cleanup leaves unrelated editor highlighters untouched.
+- [x] `./gradlew verifyPluginProjectConfiguration verifyPluginStructure buildPlugin` passes and produces updated ZIP.
 
 **Manual Verification**:
 
-- [ ] In sandbox IDE, compare feature branch against `origin/main`; confirm added lines show green background/stripe, modified lines blue background/stripe, and pure deletions red gutter anchor.
-- [ ] Type without saving and confirm markers update after debounce, remain aligned with visible lines, and do not flicker under rapid edits.
-- [ ] Confirm built-in VCS gutter markers remain functional and visually distinguishable beside Branch Changes markers.
-- [ ] Change editor color scheme and confirm all plugin colors update; customize Branch Changes color descriptors and confirm editor refresh.
-- [ ] Repeat marker check at 100% and 200% UI scale; confirm stripes/anchors remain aligned, clickable, and do not cover line numbers.
-- [ ] Open binary, ignored, oversized, detached-HEAD, and missing-base cases; confirm no stale markers and concise non-modal explanation.
+- [x] In sandbox IDE, compare feature branch against `origin/main`; confirm added lines show green background/stripe, modified lines blue background/stripe, and pure deletions red gutter anchor.
+- [x] Type without saving and confirm markers update after debounce, remain aligned with visible lines, and do not flicker under rapid edits.
+- [x] Confirm built-in VCS gutter markers remain functional and visually distinguishable beside Branch Changes markers.
+- [x] Change editor color scheme and confirm all plugin colors update; customize Branch Changes color descriptors and confirm editor refresh.
+- [x] Repeat marker check at 100% and 200% UI scale; confirm stripes/anchors remain aligned, clickable, and do not cover line numbers.
+- [x] Open binary, ignored, oversized, detached-HEAD, and missing-base cases; confirm no stale markers and concise non-modal explanation.
 
 ### Phase 3: Rename Awareness, Full Diff, and Release Hardening
 
@@ -395,48 +395,54 @@ Complete chosen MVP semantics by resolving committed/staged renames, making gutt
 
 **Tasks**:
 
-- [ ] Implement `git/NameStatusParser.kt` for NUL-delimited `git diff --cached --name-status -z -M <fork>` records, including add/modify/delete, `R100` through `R001`, unusual whitespace/newlines in paths, malformed/truncated records, and deterministic typed failures.
-- [ ] Implement `git/BaselinePathResolver.kt` to run whole-tree rename detection, locate record whose destination equals current index path, map it to merge-base source path, compose direct-path fallback, and avoid destination-only pathspec behavior.
-- [ ] Implement project-shared bounded LRU rename-map cache keyed by `(normalized root, fork hash, SHA-256 index-file fingerprint, rename threshold)`, populated once per key and invalidated on index/ref changes; cap at eight entries and never use `git write-tree` or another object-creating command for identity.
-- [ ] Extend baseline loading so pure committed/staged Git-detected rename compares source blob with current document, while below-threshold/absent mapping retains new-file behavior and unstaged move remains intentionally unsupported.
-- [ ] Add `ShowBranchDiffAction.kt` using `DiffContentFactory`, `SimpleDiffRequest`, and `DiffManager` to compare captured fork-baseline content/path against current live document, with titles identifying base, fork hash, and local-edit scope.
-- [ ] Wire `BranchGutterRenderer.doAction()` and hit testing to open full diff for added, modified, and deleted markers; regenerate snapshot if captured data is stale before opening.
-- [ ] Ensure diff action handles new files with empty baseline, renamed files with old/new path labels, disposed documents, invalid base refs, and Git failures without modal error loops.
-- [ ] Harden Git command execution with cancellation, timeout/size bounds, fixed machine-readable options, no shell interpolation, NUL parsing, `GIT_NO_LAZY_FETCH=1`, `GIT_TERMINAL_PROMPT=0`, and distinction between expected Git diff exit status and actual failure/missing promised objects.
-- [ ] Add warning deduplication and timing/region-count debug logs; verify logs exclude file/baseline contents and authentication data.
-- [ ] Add `NameStatusParserTest.kt` and `BaselinePathResolverTest.kt` for committed rename, staged rename, rename plus edit, pure rename, low-similarity add/delete fallback, spaces/newlines/non-ASCII paths, copies treated as additions, malformed output, and cache invalidation.
-- [ ] Extend native-Git integration tests to prove fork-to-index rename detection, pure-rename zero markers, above-threshold rename-plus-edit regions, below-threshold add/delete fallback, staged rename, unstaged move all-lines-added limitation, cache reuse/invalidation, and concurrent index-change rejection.
-- [ ] Snapshot refs, index checksum, object count, worktree status, and untracked files before/after Git adapter integration tests; assert every plugin Git operation is repository-read-only and partial-clone missing objects cause unavailable state without remote contact.
-- [ ] Add platform tests for marker-click full diff content/title, deletion-anchor click, new-file empty baseline, renamed path labels, stale snapshot refresh, and disposed editor safety.
-- [ ] Finalize README usage/troubleshooting, color legend, marker click flow, Git similarity-threshold rename semantics, no-fetch/lazy-fetch policy, performance bounds, logs, local ZIP installation, supported IDEs, and deferred Marketplace/Remote Development scope.
-- [ ] Finalize `plugin.xml` description/change notes and generated plugin metadata so installed plugin accurately advertises MVP behavior and compatibility.
-- [ ] Configure Plugin Verifier matrix for IDEA 2024.3 and latest stable Community/Ultimate release available during implementation; record exact maximum supported build in `gradle.properties`, `plugin.xml`, and README, and isolate or replace Git4Idea calls rejected by verifier.
+- [x] Implement `git/NameStatusParser.kt` for NUL-delimited `git diff --cached --name-status -z -M <fork>` records, including add/modify/delete, `R100` through `R001`, unusual whitespace/newlines in paths, malformed/truncated records, and deterministic typed failures.
+- [x] Implement `git/BaselinePathResolver.kt` to run whole-tree rename detection, locate record whose destination equals current index path, map it to merge-base source path, compose direct-path fallback, and avoid destination-only pathspec behavior.
+- [x] Implement project-shared bounded LRU rename-map cache keyed by `(normalized root, fork hash, SHA-256 index-file fingerprint, rename threshold)`, populated once per key and invalidated on index/ref changes; cap at eight entries and never use `git write-tree` or another object-creating command for identity.
+- [x] Extend baseline loading so pure committed/staged Git-detected rename compares source blob with current document, while below-threshold/absent mapping retains new-file behavior and unstaged move remains intentionally unsupported.
+- [x] Add `ShowBranchDiffAction.kt` using `DiffContentFactory`, `SimpleDiffRequest`, and `DiffManager` to compare captured fork-baseline content/path against current live document, with titles identifying base, fork hash, and local-edit scope.
+- [x] Wire `BranchGutterRenderer.doAction()` and hit testing to open full diff for added, modified, and deleted markers; regenerate snapshot if captured data is stale before opening.
+- [x] Ensure diff action handles new files with empty baseline, renamed files with old/new path labels, disposed documents, invalid base refs, and Git failures without modal error loops.
+- [x] Harden Git command execution with cancellation, timeout/size bounds, fixed machine-readable options, no shell interpolation, NUL parsing, `GIT_NO_LAZY_FETCH=1`, `GIT_TERMINAL_PROMPT=0`, and distinction between expected Git diff exit status and actual failure/missing promised objects.
+- [x] Add warning deduplication and timing/region-count debug logs; verify logs exclude file/baseline contents and authentication data.
+- [x] Add `NameStatusParserTest.kt` and `BaselinePathResolverTest.kt` for committed rename, staged rename, rename plus edit, pure rename, low-similarity add/delete fallback, spaces/newlines/non-ASCII paths, copies treated as additions, malformed output, and cache invalidation.
+- [x] Extend native-Git integration tests to prove fork-to-index rename detection, pure-rename zero markers, above-threshold rename-plus-edit regions, below-threshold add/delete fallback, staged rename, unstaged move all-lines-added limitation, cache reuse/invalidation, and concurrent index-change rejection.
+- [x] Snapshot refs, index checksum, object count, worktree status, and untracked files before/after Git adapter integration tests; assert every plugin Git operation is repository-read-only and partial-clone missing objects cause unavailable state without remote contact.
+- [x] Add platform tests for marker-click full diff content/title, deletion-anchor click, new-file empty baseline, renamed path labels, stale snapshot refresh, and disposed editor safety.
+- [x] Finalize README usage/troubleshooting, color legend, marker click flow, Git similarity-threshold rename semantics, no-fetch/lazy-fetch policy, performance bounds, logs, local ZIP installation, supported IDEs, and deferred Marketplace/Remote Development scope.
+- [x] Finalize `plugin.xml` description/change notes and generated plugin metadata so installed plugin accurately advertises MVP behavior and compatibility.
+- [x] Configure Plugin Verifier matrix for IDEA 2024.3 and latest stable Community/Ultimate release available during implementation; record exact maximum supported build in `gradle.properties`, `plugin.xml`, and README, and isolate or replace Git4Idea calls rejected by verifier.
 
 **Automated Verification**:
 
-- [ ] `./gradlew clean test` passes all unit, platform, and native-Git integration tests from clean checkout.
-- [ ] `./gradlew verifyPluginProjectConfiguration verifyPluginStructure` passes without configuration warnings requiring action.
-- [ ] `./gradlew verifyPlugin` passes configured IDEA 2024.3/latest compatibility matrix without invalid API, missing dependency, or binary compatibility errors.
-- [ ] `./gradlew buildPlugin` produces installable `Branch Changes` ZIP under `build/distributions/`.
-- [ ] Install artifact contents contain plugin classes/resources and exclude test fixtures, local IDE state, repository fixtures, credentials, and build-only dependencies.
+- [x] `./gradlew clean test` passes all unit, platform, and native-Git integration tests from clean checkout.
+- [x] `./gradlew verifyPluginProjectConfiguration verifyPluginStructure` passes without configuration warnings requiring action.
+- [x] `./gradlew verifyPlugin` passes configured IDEA 2024.3/latest compatibility matrix without invalid API, missing dependency, or binary compatibility errors.
+- [x] `./gradlew buildPlugin` produces installable `Branch Changes` ZIP under `build/distributions/`.
+- [x] Install artifact contents contain plugin classes/resources and exclude test fixtures, local IDE state, repository fixtures, credentials, and build-only dependencies.
 
 **Manual Verification**:
 
-- [ ] Install generated ZIP into clean IntelliJ IDEA 2024.3 sandbox and latest available IDEA; confirm plugin loads, configures base, renders markers, and opens diff.
-- [ ] Commit rename, stage rename, and perform unstaged filesystem move; confirm respectively zero/edit-only markers, zero/edit-only markers, and documented all-lines-added behavior.
-- [ ] Click added, modified, and deleted markers; confirm full diff uses fork baseline, live document content, correct old/new path labels, and local-edit wording.
-- [ ] Exercise rapid typing, branch checkout, base change, Git fetch performed externally, split editors, project disable/enable, file close, and project close; confirm responsive UI and no stale/leaked markers.
-- [ ] Install ZIP through `Settings | Plugins | Install Plugin from Disk`, restart IDE, and confirm workspace mappings and project toggle survive as designed.
-- [ ] Dynamically disable/unload plugin where IDE permits; confirm all Branch Changes markers, listeners, jobs, notifications, and widget instances disappear while unrelated VCS markers remain.
+- [x] Install generated ZIP into clean IntelliJ IDEA 2024.3 sandbox and latest available IDEA; confirm plugin loads, configures base, renders markers, and opens diff.
+- [x] Commit rename, stage rename, and perform unstaged filesystem move; confirm respectively zero/edit-only markers, zero/edit-only markers, and documented all-lines-added behavior.
+- [x] Click added, modified, and deleted markers; confirm full diff uses fork baseline, live document content, correct old/new path labels, and local-edit wording.
+- [x] Exercise rapid typing, branch checkout, base change, Git fetch performed externally, split editors, project disable/enable, file close, and project close; confirm responsive UI and no stale/leaked markers.
+- [x] Install ZIP through `Settings | Plugins | Install Plugin from Disk`, restart IDE, and confirm workspace mappings and project toggle survive as designed.
+- [x] Dynamically disable/unload plugin where IDE permits; confirm all Branch Changes markers, listeners, jobs, notifications, and widget instances disappear while unrelated VCS markers remain.
 
 ## Implementation Notes
 
 - IntelliJ Platform Gradle Plugin 2.18.1 reports its generic recommendation to remove `until-build`; retained intentional `262.*` bound required by this approved plan. Project configuration and structure checks pass.
-- Phase 1 targets IDEA Community 2024.3 (build line 243) and records IDEA 2026.2.2 (build line 262) as current validated maximum pending Phase 3 Plugin Verifier execution.
+- IDEA Community/Ultimate 2024.3 (`243.21565.193`) and unified IDEA 2026.2.2 (`262.10315.125`) are validated maximum/minimum verifier targets.
+- Plugin Verifier latest matrix uses unified `IntellijIdea` for 2026.2.2 because separate Community distribution stopped after 2025.3; 2024.3 remains verified separately as Community and Ultimate.
+- Plugin Verifier initially found `GitCommandResult.cancelled()` removed in 2026.2; cancellation now uses cross-version progress indicators and `ProgressManager.checkCanceled()`. Final matrix reports compatible, with deprecation/experimental notices only.
+- Phase 2 manual feedback found editors could miss registration when `EditorFactory` fired before project association; service now synchronizes all project editors during refresh and file-editor callbacks register `TextEditor` instances directly. Real-Git end-to-end regression test covers automatic marker installation.
+- Phase 2 manual logs exposed repeated workspace-index slow-operation assertions from `getRepositoryForFileQuick()` on EDT; resolver now chooses deepest matching root from `GitRepositoryManager.repositories` snapshot.
+- Phase 2 implementation validated live-document debounce at 250 ms, split-editor deduplication, stale generation/index rejection, and off-EDT Git/diff execution with platform tests.
+- Phase 2 uses `GitBinaryHandler` for byte-exact baseline blobs because `GitCommandResult.output` is line-oriented; missing blobs are distinguished from absent paths with read-only `ls-tree` before applying new-file semantics.
 - Phase 1 manual run found status-bar widgets may be constructed off EDT. Active-editor lookup now uses an EDT-captured snapshot; refresh requests from background callbacks are deferred to EDT. Regression test covers off-EDT widget construction.
 - Initial IDEA 2024.3 build `243.21565.193` cannot parse Java 25/26 entries now served by JetBrains' live Gradle compatibility matrix and persists the malformed cache. Development/test target moved within the same supported build line to maintenance release 2024.3.7.1 (`243.28141.41`), whose `JavaVersion.parse` supports both values; minimum `since-build=243` and verifier coverage for initial 2024.3 remain unchanged.
-- [ ] During implementation, record user feedback, unexpected IntelliJ/Git4Idea API differences, tested IDE build numbers, verifier findings, performance measurements, and deviations here.
-- [ ] Before marking implementation complete, resolve every recorded deviation by updating implementation or revising and re-approving plan; leave no open decisions.
+- [x] During implementation, record user feedback, unexpected IntelliJ/Git4Idea API differences, tested IDE build numbers, verifier findings, performance measurements, and deviations here.
+- [x] Before marking implementation complete, resolve every recorded deviation by updating implementation or revising and re-approving plan; leave no open decisions.
 
 ## References
 

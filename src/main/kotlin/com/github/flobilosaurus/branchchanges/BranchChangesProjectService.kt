@@ -1,28 +1,71 @@
 package com.github.flobilosaurus.branchchanges
 
+import com.github.flobilosaurus.branchchanges.diff.BranchLineComparator
+import com.github.flobilosaurus.branchchanges.diff.LineComparisonResult
+import com.github.flobilosaurus.branchchanges.editor.BranchHighlightRenderer
+import com.github.flobilosaurus.branchchanges.editor.ShowBranchDiffAction
 import com.github.flobilosaurus.branchchanges.git.BranchContextResolver
+import com.github.flobilosaurus.branchchanges.git.BaselinePathResolver
+import com.github.flobilosaurus.branchchanges.git.BaselinePathResult
+import com.github.flobilosaurus.branchchanges.git.BranchGitClient
+import com.github.flobilosaurus.branchchanges.git.BranchGitOperations
 import com.github.flobilosaurus.branchchanges.git.BranchRefProvider
 import com.github.flobilosaurus.branchchanges.git.GitBranchRefProvider
+import com.github.flobilosaurus.branchchanges.git.GitOperationResult
+import com.github.flobilosaurus.branchchanges.model.BranchContext
+import com.github.flobilosaurus.branchchanges.model.ComparisonIdentity
+import com.github.flobilosaurus.branchchanges.model.ComparisonLimits
+import com.github.flobilosaurus.branchchanges.model.ComparisonResult
+import com.github.flobilosaurus.branchchanges.model.ComparisonSnapshot
+import com.github.flobilosaurus.branchchanges.model.ComparisonUnavailableReason
+import com.github.flobilosaurus.branchchanges.model.TextMetadata
+import com.github.flobilosaurus.branchchanges.model.normalizedLineCount
 import com.github.flobilosaurus.branchchanges.settings.BranchBaseSettings
 import com.github.flobilosaurus.branchchanges.ui.BranchBaseChooser
+import com.intellij.ide.plugins.DynamicPluginListener
+import com.intellij.ide.plugins.IdeaPluginDescriptor
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.colors.EditorColorsListener
+import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.editor.event.DocumentEvent
+import com.intellij.openapi.editor.event.DocumentListener
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx
+import com.intellij.openapi.progress.EmptyProgressIndicator
+import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
+import com.intellij.openapi.vfs.newvfs.events.VFileMoveEvent
+import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.ui.EditorNotifications
 import com.intellij.util.messages.Topic
 import git4idea.repo.GitRepository
+import java.nio.charset.Charset
+import java.util.Collections
+import java.util.IdentityHashMap
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 @Service(Service.Level.PROJECT)
 class BranchChangesProjectService(
@@ -32,16 +75,15 @@ class BranchChangesProjectService(
     sealed interface UiState {
         data object Disabled : UiState
         data object NoFile : UiState
-        data class SelectBase(val context: BranchContextResolver.Context) : UiState
-        data class Base(val context: BranchContextResolver.Context, val baseRef: String) : UiState
-        data class Unavailable(
-            val reason: BranchContextResolver.UnavailableReason,
-        ) : UiState
-
-        data class InvalidBase(
-            val context: BranchContextResolver.Context,
+        data class SelectBase(val context: BranchContext) : UiState
+        data class Base(val context: BranchContext, val baseRef: String) : UiState
+        data class ComparisonUnavailable(
+            val context: BranchContext,
             val baseRef: String,
+            val reason: ComparisonUnavailableReason,
         ) : UiState
+        data class Unavailable(val reason: BranchContextResolver.UnavailableReason) : UiState
+        data class InvalidBase(val context: BranchContext, val baseRef: String) : UiState
     }
 
     fun interface UiListener {
@@ -50,6 +92,28 @@ class BranchChangesProjectService(
 
     private data class MappingKey(val rootUrl: String, val branchName: String)
 
+    private data class ComparisonRequest(
+        val document: Document,
+        val file: VirtualFile,
+        val context: BranchContext,
+        val baseRef: String,
+        val text: String,
+        val charset: Charset,
+        val documentStamp: Long,
+        val generation: Long,
+    )
+
+    private class DocumentEntry(
+        val document: Document,
+        val editors: MutableSet<Editor>,
+        val listener: DocumentListener,
+    ) {
+        var generation: Long = 0
+        var job: Job? = null
+        var lastResult: ComparisonResult? = null
+    }
+
+    private val log = Logger.getInstance(BranchChangesProjectService::class.java)
     private val settings = BranchBaseSettings.getInstance(project)
     private val contextResolver = BranchContextResolver(project, settings)
     private val refProvider: BranchRefProvider = GitBranchRefProvider(project)
@@ -57,6 +121,24 @@ class BranchChangesProjectService(
     private val initialized = AtomicBoolean(false)
     private val validationGeneration = AtomicLong()
     private val invalidBases = ConcurrentHashMap<MappingKey, String>()
+    private val warnedFailures = ConcurrentHashMap.newKeySet<String>()
+    private val documentEntries = IdentityHashMap<Document, DocumentEntry>()
+    private val renderer = BranchHighlightRenderer()
+    private val showDiffAction = ShowBranchDiffAction()
+    private val pendingDiffEditors = Collections.newSetFromMap(IdentityHashMap<Editor, Boolean>())
+
+    @Volatile
+    internal var gitOperations: BranchGitOperations = BranchGitClient(project)
+        set(value) {
+            field = value
+            baselinePathResolver = BaselinePathResolver(value)
+        }
+
+    @Volatile
+    private var baselinePathResolver = BaselinePathResolver(gitOperations)
+
+    @Volatile
+    internal var lineComparator: BranchLineComparator = BranchLineComparator()
 
     @Volatile
     private var currentFileSnapshot: VirtualFile? = null
@@ -68,15 +150,34 @@ class BranchChangesProjectService(
     fun initialize() {
         if (!initialized.compareAndSet(false, true) || project.isDisposed) return
 
+        ApplicationManager.getApplication().messageBus.connect(this).subscribe(
+            DynamicPluginListener.TOPIC,
+            object : DynamicPluginListener {
+                override fun beforePluginUnload(pluginDescriptor: IdeaPluginDescriptor, isUpdate: Boolean) {
+                    this@BranchChangesProjectService.beforePluginUnload(pluginDescriptor.pluginId.idString)
+                }
+            },
+        )
         project.messageBus.connect(this).apply {
-            subscribe(BranchBaseSettings.TOPIC, BranchBaseSettings.Listener {
-                refresh("settings")
-            })
-            subscribe(GitRepository.GIT_REPO_CHANGE, git4idea.repo.GitRepositoryChangeListener {
-                refresh("repository")
+            subscribe(BranchBaseSettings.TOPIC, BranchBaseSettings.Listener { refresh("settings") })
+            subscribe(GitRepository.GIT_REPO_CHANGE, git4idea.repo.GitRepositoryChangeListener { refresh("repository") })
+            subscribe(EditorColorsManager.TOPIC, EditorColorsListener { refresh("color-scheme") })
+            subscribe(VirtualFileManager.VFS_CHANGES, object : BulkFileListener {
+                override fun after(events: List<VFileEvent>) {
+                    if (events.any {
+                            it is VFileMoveEvent ||
+                                (it is VFilePropertyChangeEvent && it.propertyName == VirtualFile.PROP_NAME)
+                        }
+                    ) refresh("vfs")
+                }
             })
         }
-        refresh("startup")
+        runOnEdt {
+            EditorFactory.getInstance().allEditors
+                .filter { it.project === project }
+                .forEach(::registerEditor)
+            refresh("startup")
+        }
     }
 
     fun uiState(file: VirtualFile? = currentFile()): UiState {
@@ -89,8 +190,13 @@ class BranchChangesProjectService(
                 val context = resolved.context
                 val base = context.configuredBaseRef ?: return UiState.SelectBase(context)
                 val key = MappingKey(context.rootUrl, context.branchName)
-                if (invalidBases[key] == base) {
+                if (invalidBases[key] == base) return UiState.InvalidBase(context, base)
+                val document = FileDocumentManager.getInstance().getDocument(file)
+                val unavailable = document?.let { documentEntries[it]?.lastResult as? ComparisonResult.Unavailable }
+                if (unavailable?.reason == ComparisonUnavailableReason.INVALID_BASE) {
                     UiState.InvalidBase(context, base)
+                } else if (unavailable != null && unavailable.reason !in TRANSIENT_UI_REASONS) {
+                    UiState.ComparisonUnavailable(context, base, unavailable.reason)
                 } else {
                     UiState.Base(context, base)
                 }
@@ -110,9 +216,7 @@ class BranchChangesProjectService(
             if (current !is BranchContextResolver.Result.Available ||
                 current.context.rootUrl != context.rootUrl ||
                 current.context.branchName != context.branchName
-            ) {
-                return@choose
-            }
+            ) return@choose
             val previous = settings.getBase(context.rootUrl, context.branchName)
             settings.setBase(context.rootUrl, context.branchName, selected.fullName)
             invalidBases.remove(MappingKey(context.rootUrl, context.branchName))
@@ -120,9 +224,7 @@ class BranchChangesProjectService(
         }
     }
 
-    fun setEnabled(enabled: Boolean) {
-        settings.setEnabled(enabled)
-    }
+    fun setEnabled(enabled: Boolean) = settings.setEnabled(enabled)
 
     fun toggleEnabled() = setEnabled(!settings.isEnabled())
 
@@ -131,10 +233,7 @@ class BranchChangesProjectService(
     fun currentFile(): VirtualFile? {
         if (project.isDisposed) return null
         if (!ApplicationManager.getApplication().isDispatchThread) return currentFileSnapshot
-
-        return FileEditorManagerEx.getInstanceEx(project).currentFile.also {
-            currentFileSnapshot = it
-        }
+        return FileEditorManagerEx.getInstanceEx(project).currentFile.also { currentFileSnapshot = it }
     }
 
     fun displayRef(ref: String): String = when {
@@ -145,43 +244,339 @@ class BranchChangesProjectService(
 
     fun refresh(cause: String) {
         if (project.isDisposed) return
-        if (!ApplicationManager.getApplication().isDispatchThread) {
-            ApplicationManager.getApplication().invokeLater({
-                refresh(cause)
-            }, ModalityState.nonModal())
-            return
+        runOnEdt {
+            if (project.isDisposed) return@runOnEdt
+            validationGeneration.incrementAndGet()
+            if (cause == "repository") baselinePathResolver.clear()
+            currentFile()
+            synchronizeEditors()
+            if (!settings.isEnabled()) {
+                cancelAndClearAll()
+            } else {
+                documentEntries.values.toList().forEach { schedule(it, cause) }
+            }
+            publishUiUpdate()
+            val state = uiState(currentFileSnapshot)
+            if (state is UiState.Base) validateConfiguredBase(state.context, state.baseRef)
         }
+    }
 
-        val generation = validationGeneration.incrementAndGet()
-        val file = currentFile()
+    fun onEditorCreated(editor: Editor) = runOnEdt {
+        if (editor.project === project && !editor.isDisposed) {
+            val existing = documentEntries[editor.document]
+            registerEditor(editor)
+            val entry = documentEntries.getValue(editor.document)
+            val snapshot = (existing?.lastResult as? ComparisonResult.Available)?.snapshot
+            if (snapshot != null) renderer.replace(editor, snapshot) else schedule(entry, "editor-open")
+        }
         publishUiUpdate()
+    }
 
-        val state = uiState(file)
-        if (state is UiState.Base) {
-            validateConfiguredBase(state.context, state.baseRef, generation)
-        }
+    fun onEditorReleased(editor: Editor) = runOnEdt {
+        unregisterEditor(editor)
+        publishUiUpdate()
     }
 
     fun onEditorContextChanged() = refresh("editor")
 
-    private fun validateConfiguredBase(
-        context: BranchContextResolver.Context,
-        baseRef: String,
-        generation: Long,
-    ) {
+    internal fun snapshotFor(document: Document): ComparisonSnapshot? =
+        (documentEntries[document]?.lastResult as? ComparisonResult.Available)?.snapshot
+
+    internal fun ownedHighlighters(editor: Editor) = renderer.ownedHighlighters(editor)
+
+    fun showDiff(editor: Editor) = runOnEdt {
+        if (editor.isDisposed || editor.project !== project) return@runOnEdt
+        val entry = documentEntries[editor.document] ?: return@runOnEdt
+        val snapshot = (entry.lastResult as? ComparisonResult.Available)?.snapshot
+        val file = FileDocumentManager.getInstance().getFile(editor.document)
+        if (snapshot == null || file == null || snapshot.identity.documentModificationStamp != editor.document.modificationStamp) {
+            pendingDiffEditors.add(editor)
+            schedule(entry, "stale-diff-click")
+            return@runOnEdt
+        }
+        showDiffAction.show(project, editor.document, file, snapshot)
+    }
+
+    internal fun beforePluginUnload(pluginId: String) {
+        if (pluginId == PLUGIN_ID) runOnEdt(::cancelAndClearAll)
+    }
+
+    private fun synchronizeEditors() {
+        EditorFactory.getInstance().allEditors
+            .asSequence()
+            .filter { it.project === project && !it.isDisposed }
+            .forEach(::registerEditor)
+        documentEntries.values.toList().forEach { entry ->
+            entry.editors.filter(Editor::isDisposed).toList().forEach { entry.editors.remove(it) }
+            if (entry.editors.isEmpty()) {
+                entry.job?.cancel()
+                entry.document.removeDocumentListener(entry.listener)
+                documentEntries.remove(entry.document)
+            }
+        }
+    }
+
+    private fun registerEditor(editor: Editor) {
+        if (documentEntries[editor.document]?.editors?.add(editor) == true) return
+        if (documentEntries.containsKey(editor.document)) return
+        val listener = object : DocumentListener {
+            override fun documentChanged(event: DocumentEvent) {
+                documentEntries[event.document]?.let { schedule(it, "document-change") }
+            }
+        }
+        val editors = Collections.newSetFromMap(IdentityHashMap<Editor, Boolean>())
+        editors.add(editor)
+        editor.document.addDocumentListener(listener)
+        documentEntries[editor.document] = DocumentEntry(editor.document, editors, listener)
+    }
+
+    private fun unregisterEditor(editor: Editor) {
+        renderer.clear(editor)
+        pendingDiffEditors.remove(editor)
+        val entry = documentEntries[editor.document] ?: return
+        entry.editors.remove(editor)
+        if (entry.editors.isEmpty()) {
+            entry.job?.cancel()
+            entry.document.removeDocumentListener(entry.listener)
+            documentEntries.remove(entry.document)
+        }
+    }
+
+    private fun schedule(entry: DocumentEntry, cause: String) {
+        ApplicationManager.getApplication().assertIsDispatchThread()
+        entry.job?.cancel()
+        entry.generation++
+        val generation = entry.generation
+        val file = FileDocumentManager.getInstance().getFile(entry.document)
+        if (!settings.isEnabled() || file == null || !file.isValid || file.fileType.isBinary) {
+            clearEntry(entry, null)
+            return
+        }
+        val context = when (val resolved = contextResolver.resolve(file)) {
+            is BranchContextResolver.Result.Available -> resolved.context
+            is BranchContextResolver.Result.Unavailable -> {
+                clearEntry(entry, ComparisonResult.Unavailable(mapContextReason(resolved.reason)))
+                return
+            }
+        }
+        val baseRef = context.configuredBaseRef
+        if (baseRef == null) {
+            clearEntry(entry, ComparisonResult.Unavailable(ComparisonUnavailableReason.NO_BASE))
+            return
+        }
+        if (invalidBases[MappingKey(context.rootUrl, context.branchName)] == baseRef) {
+            clearEntry(entry, ComparisonResult.Unavailable(ComparisonUnavailableReason.INVALID_BASE))
+            return
+        }
+        val request = ComparisonRequest(
+            entry.document,
+            file,
+            context,
+            baseRef,
+            entry.document.immutableCharSequence.toString(),
+            file.charset,
+            entry.document.modificationStamp,
+            generation,
+        )
+        val indicator = EmptyProgressIndicator()
+        entry.job = coroutineScope.launch(Dispatchers.IO) {
+            var timeoutJob: Job? = null
+            try {
+                delay(DEBOUNCE_MILLIS)
+                timeoutJob = coroutineScope.launch(Dispatchers.IO) {
+                    delay(COMPUTATION_TIMEOUT_MILLIS)
+                    indicator.cancel()
+                }
+                val result = ProgressManager.getInstance().runProcess<ComparisonResult>(
+                    { compute(request, indicator) },
+                    indicator,
+                )
+                coroutineContext.ensureActive()
+                applyResult(entry, request, result)
+            } catch (_: CancellationException) {
+                indicator.cancel()
+            } catch (_: ProcessCanceledException) {
+                if (coroutineContext.isActive) {
+                    applyResult(entry, request, unavailable(ComparisonUnavailableReason.GIT_TIMEOUT))
+                }
+            } catch (error: Exception) {
+                log.warn(
+                    "Branch Changes comparison failed: root=${request.context.rootPath} path=${request.context.relativePath}",
+                    error,
+                )
+                applyResult(entry, request, unavailable(ComparisonUnavailableReason.GIT_FAILURE))
+            } finally {
+                timeoutJob?.cancel()
+            }
+        }.also { job -> job.invokeOnCompletion { indicator.cancel() } }
+        log.debug("Branch Changes refresh scheduled: cause=$cause generation=$generation path=${context.relativePath}")
+    }
+
+    private fun compute(request: ComparisonRequest, indicator: EmptyProgressIndicator): ComparisonResult {
+        check(!ApplicationManager.getApplication().isDispatchThread) { "Git/diff work must not run on EDT" }
+        val startedAt = System.nanoTime()
+        val currentBytes = request.text.toByteArray(request.charset).size.toLong()
+        if (currentBytes > ComparisonLimits.MAX_BYTES) return unavailable(ComparisonUnavailableReason.FILE_TOO_LARGE)
+        val currentLines = normalizedLineCount(request.text)
+        if (currentLines > ComparisonLimits.MAX_LINES) return unavailable(ComparisonUnavailableReason.TOO_MANY_LINES)
+
+        val captured = when (val result = gitOperations.capture(request.context.repository, request.baseRef)) {
+            is GitOperationResult.Success -> result.value
+            is GitOperationResult.Unavailable -> return ComparisonResult.Unavailable(result.reason, result.detail)
+        }
+        if (captured.headHash != request.context.headHash) return unavailable(ComparisonUnavailableReason.FILE_CHANGED)
+        val baselinePath = when (val resolved = baselinePathResolver.resolve(
+            request.context.repository,
+            request.context.rootUrl,
+            captured.forkHash,
+            captured.indexFingerprint,
+            request.context.relativePath,
+        )) {
+            is BaselinePathResult.Success -> resolved.baselinePath
+            is BaselinePathResult.Unavailable -> return ComparisonResult.Unavailable(resolved.reason, resolved.detail)
+        }
+        val baseline = when (val result = gitOperations.loadBaseline(
+            request.context.repository,
+            captured.forkHash,
+            baselinePath,
+            request.charset,
+        )) {
+            is GitOperationResult.Success -> result.value
+            is GitOperationResult.Unavailable -> return ComparisonResult.Unavailable(result.reason, result.detail)
+        }
+        val gitFinishedAt = System.nanoTime()
+        val regions = when (val compared = lineComparator.compare(baseline.text, request.text, indicator)) {
+            is LineComparisonResult.Success -> compared.regions
+            is LineComparisonResult.Unavailable -> return unavailable(compared.reason)
+        }
+        val finalFingerprint = when (val result = gitOperations.indexFingerprint(request.context.repository)) {
+            is GitOperationResult.Success -> result.value
+            is GitOperationResult.Unavailable -> return ComparisonResult.Unavailable(result.reason, result.detail)
+        }
+        if (finalFingerprint != captured.indexFingerprint) return unavailable(ComparisonUnavailableReason.INDEX_CHANGED)
+
+        val identity = ComparisonIdentity(
+            request.context.rootUrl,
+            request.context.relativePath,
+            request.context.branchName,
+            request.baseRef,
+            captured.baseTipHash,
+            captured.headHash,
+            captured.forkHash,
+            captured.indexFingerprint,
+            request.documentStamp,
+            request.generation,
+        )
+        val snapshot = ComparisonSnapshot(
+                identity,
+                baselinePath,
+                request.context.relativePath,
+                baseline.text,
+                request.text,
+                TextMetadata(
+                    baseline.bytes.toLong(),
+                    normalizedLineCount(baseline.text),
+                    request.charset,
+                    baseline.text.endsWith('\n'),
+                ),
+                TextMetadata(currentBytes, currentLines, request.charset, request.text.endsWith('\n')),
+                regions,
+            )
+        val finishedAt = System.nanoTime()
+        log.debug(
+            "Branch Changes refresh complete: root=${request.context.rootPath} branch=${request.context.branchName} " +
+                "base=${request.baseRef} fork=${captured.forkHash.take(7)} generation=${request.generation} " +
+                "regions=${regions.size} gitMs=${(gitFinishedAt - startedAt) / 1_000_000} " +
+                "diffMs=${(finishedAt - gitFinishedAt) / 1_000_000}",
+        )
+        return ComparisonResult.Available(snapshot)
+    }
+
+    private fun applyResult(entry: DocumentEntry, request: ComparisonRequest, result: ComparisonResult) {
+        runOnEdt {
+            if (project.isDisposed || documentEntries[request.document] !== entry ||
+                entry.generation != request.generation || request.document.modificationStamp != request.documentStamp ||
+                !request.file.isValid || FileDocumentManager.getInstance().getFile(request.document) != request.file
+            ) return@runOnEdt
+            val current = contextResolver.resolve(request.file)
+            if (current !is BranchContextResolver.Result.Available ||
+                current.context.rootUrl != request.context.rootUrl ||
+                current.context.relativePath != request.context.relativePath ||
+                current.context.branchName != request.context.branchName ||
+                current.context.headHash != request.context.headHash ||
+                current.context.configuredBaseRef != request.baseRef
+            ) return@runOnEdt
+            if (result is ComparisonResult.Available) {
+                val currentBaseTip = current.context.repository.info.localBranchesWithHashes.entries
+                    .asSequence()
+                    .map { it.key.fullName to it.value.asString() }
+                    .plus(
+                        current.context.repository.info.remoteBranchesWithHashes.entries
+                            .asSequence()
+                            .map { it.key.fullName to it.value.asString() },
+                    )
+                    .firstOrNull { it.first == request.baseRef }
+                    ?.second
+                if (currentBaseTip != result.snapshot.identity.baseTipHash) return@runOnEdt
+            }
+
+            entry.lastResult = result
+            when (result) {
+                is ComparisonResult.Available -> entry.editors.toList().forEach { editor ->
+                    if (!editor.isDisposed) {
+                        renderer.replace(editor, result.snapshot, ::showDiff)
+                        if (pendingDiffEditors.remove(editor)) {
+                            showDiffAction.show(project, editor.document, request.file, result.snapshot)
+                        }
+                    }
+                }
+                is ComparisonResult.Unavailable -> {
+                    warnOnce(request, result)
+                    entry.editors.toList().forEach(renderer::clear)
+                    pendingDiffEditors.removeAll(entry.editors)
+                }
+            }
+            publishUiUpdate()
+        }
+    }
+
+    private fun warnOnce(request: ComparisonRequest, result: ComparisonResult.Unavailable) {
+        if (result.reason !in WARN_REASONS) return
+        val key = "${request.context.rootUrl}|${request.context.relativePath}|${result.reason}|${result.detail}"
+        if (warnedFailures.add(key)) {
+            log.warn(
+                "Branch Changes comparison unavailable: root=${request.context.rootPath} " +
+                    "path=${request.context.relativePath} reason=${result.reason}" +
+                    result.detail?.let { " detail=${it.take(240)}" }.orEmpty(),
+            )
+        }
+    }
+
+    private fun clearEntry(entry: DocumentEntry, result: ComparisonResult?) {
+        entry.job?.cancel()
+        entry.job = null
+        entry.lastResult = result
+        entry.editors.toList().forEach(renderer::clear)
+    }
+
+    private fun cancelAndClearAll() {
+        documentEntries.values.forEach { clearEntry(it, unavailable(ComparisonUnavailableReason.DISABLED)) }
+    }
+
+    private fun validateConfiguredBase(context: BranchContext, baseRef: String) {
         coroutineScope.launch(Dispatchers.IO) {
             val validation = refProvider.validate(context.repository, context.branchName, baseRef)
             coroutineContext.ensureActive()
-            if (project.isDisposed || validationGeneration.get() != generation) return@launch
+            if (project.isDisposed || settings.getBase(context.rootUrl, context.branchName) != baseRef) return@launch
             val key = MappingKey(context.rootUrl, context.branchName)
-            when (validation) {
-                is BranchRefProvider.Validation.Valid -> invalidBases.remove(key)
+            val changed = when (validation) {
+                is BranchRefProvider.Validation.Valid -> invalidBases.remove(key) != null
                 BranchRefProvider.Validation.Cancelled -> return@launch
                 BranchRefProvider.Validation.CurrentBranch,
                 BranchRefProvider.Validation.Invalid,
-                -> invalidBases[key] = baseRef
+                -> invalidBases.put(key, baseRef) != baseRef
             }
-            publishUiUpdate()
+            if (changed) refresh("base-validation") else publishUiUpdate()
         }
     }
 
@@ -194,15 +589,54 @@ class BranchChangesProjectService(
         }, ModalityState.nonModal())
     }
 
+    private fun mapContextReason(reason: BranchContextResolver.UnavailableReason) = when (reason) {
+        BranchContextResolver.UnavailableReason.NOT_GIT -> ComparisonUnavailableReason.NOT_GIT
+        BranchContextResolver.UnavailableReason.DETACHED_HEAD -> ComparisonUnavailableReason.DETACHED_HEAD
+        BranchContextResolver.UnavailableReason.UNBORN_BRANCH -> ComparisonUnavailableReason.UNBORN_BRANCH
+        BranchContextResolver.UnavailableReason.NO_LOCAL_BRANCH -> ComparisonUnavailableReason.NO_LOCAL_BRANCH
+    }
+
+    private fun unavailable(reason: ComparisonUnavailableReason) = ComparisonResult.Unavailable(reason)
+
+    private fun runOnEdt(action: () -> Unit) {
+        if (ApplicationManager.getApplication().isDispatchThread) action()
+        else ApplicationManager.getApplication().invokeLater(action, ModalityState.nonModal())
+    }
+
     override fun dispose() {
         disposed = true
         validationGeneration.incrementAndGet()
         currentFileSnapshot = null
         invalidBases.clear()
+        warnedFailures.clear()
+        pendingDiffEditors.clear()
+        documentEntries.values.forEach { entry ->
+            entry.job?.cancel()
+            entry.document.removeDocumentListener(entry.listener)
+        }
+        documentEntries.clear()
+        if (ApplicationManager.getApplication().isDispatchThread) renderer.clearAll()
+        else ApplicationManager.getApplication().invokeLater(renderer::clearAll)
     }
 
     companion object {
         const val WIDGET_ID = "BranchChanges"
+        private const val PLUGIN_ID = "com.github.flobilosaurus.branchchanges"
+        private const val DEBOUNCE_MILLIS = 250L
+        private const val COMPUTATION_TIMEOUT_MILLIS = 15_000L
+        private val WARN_REASONS = setOf(
+            ComparisonUnavailableReason.GIT_FAILURE,
+            ComparisonUnavailableReason.MALFORMED_GIT_OUTPUT,
+            ComparisonUnavailableReason.MISSING_OBJECT,
+            ComparisonUnavailableReason.GIT_TIMEOUT,
+            ComparisonUnavailableReason.NO_MERGE_BASE,
+            ComparisonUnavailableReason.MULTIPLE_MERGE_BASES,
+        )
+        private val TRANSIENT_UI_REASONS = setOf(
+            ComparisonUnavailableReason.CANCELLED,
+            ComparisonUnavailableReason.DISABLED,
+            ComparisonUnavailableReason.NO_BASE,
+        )
 
         @JvmField
         val UI_TOPIC: Topic<UiListener> = Topic.create("Branch Changes UI state", UiListener::class.java)

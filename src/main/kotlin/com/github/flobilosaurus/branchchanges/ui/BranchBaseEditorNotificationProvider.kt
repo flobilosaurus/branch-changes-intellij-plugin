@@ -42,6 +42,12 @@ class BranchBaseEditorNotificationProvider : EditorNotificationProvider {
                 )
             }
 
+            is BranchChangesProjectService.UiState.ComparisonUnavailable -> Function { fileEditor ->
+                EditorNotificationPanel(fileEditor).apply {
+                    setText(comparisonUnavailableText(state.reason))
+                }
+            }
+
             BranchChangesProjectService.UiState.Disabled,
             BranchChangesProjectService.UiState.NoFile,
             is BranchChangesProjectService.UiState.Base,
@@ -49,6 +55,24 @@ class BranchBaseEditorNotificationProvider : EditorNotificationProvider {
             -> null
         }
     }
+
+    private fun comparisonUnavailableText(
+        reason: com.github.flobilosaurus.branchchanges.model.ComparisonUnavailableReason,
+    ): String = BranchChangesBundle.message(
+        when (reason) {
+            com.github.flobilosaurus.branchchanges.model.ComparisonUnavailableReason.NO_BASE -> "unavailable.noBase"
+            com.github.flobilosaurus.branchchanges.model.ComparisonUnavailableReason.INVALID_BASE -> "unavailable.invalidBase"
+            com.github.flobilosaurus.branchchanges.model.ComparisonUnavailableReason.BINARY -> "unavailable.binary"
+            com.github.flobilosaurus.branchchanges.model.ComparisonUnavailableReason.NEW_FILE_IGNORED -> "unavailable.ignored"
+            com.github.flobilosaurus.branchchanges.model.ComparisonUnavailableReason.FILE_TOO_LARGE -> "unavailable.fileTooLarge"
+            com.github.flobilosaurus.branchchanges.model.ComparisonUnavailableReason.TOO_MANY_LINES -> "unavailable.tooManyLines"
+            com.github.flobilosaurus.branchchanges.model.ComparisonUnavailableReason.NO_MERGE_BASE -> "unavailable.noMergeBase"
+            com.github.flobilosaurus.branchchanges.model.ComparisonUnavailableReason.MULTIPLE_MERGE_BASES -> "unavailable.multipleMergeBases"
+            com.github.flobilosaurus.branchchanges.model.ComparisonUnavailableReason.DIFF_TOO_BIG -> "unavailable.diffTooBig"
+            com.github.flobilosaurus.branchchanges.model.ComparisonUnavailableReason.INDEX_CHANGED -> "unavailable.indexChanged"
+            else -> "unavailable.gitFailure"
+        },
+    )
 
     private fun createPanel(
         fileEditor: FileEditor,

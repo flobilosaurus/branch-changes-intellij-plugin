@@ -40,6 +40,7 @@ class BranchChangesStatusBarWidget(private val project: Project) :
             is BranchChangesProjectService.UiState.SelectBase -> BranchChangesBundle.message("status.selectBase")
             BranchChangesProjectService.UiState.Disabled -> BranchChangesBundle.message("status.disabled")
             is BranchChangesProjectService.UiState.InvalidBase,
+            is BranchChangesProjectService.UiState.ComparisonUnavailable,
             is BranchChangesProjectService.UiState.Unavailable,
             BranchChangesProjectService.UiState.NoFile,
             -> BranchChangesBundle.message("status.unavailable")
@@ -61,6 +62,11 @@ class BranchChangesStatusBarWidget(private val project: Project) :
         is BranchChangesProjectService.UiState.InvalidBase -> BranchChangesBundle.message(
             "status.tooltip.unavailable",
             BranchChangesBundle.message("unavailable.invalidBase"),
+        )
+
+        is BranchChangesProjectService.UiState.ComparisonUnavailable -> BranchChangesBundle.message(
+            "status.tooltip.unavailable",
+            state.reason.name.lowercase().replace('_', ' '),
         )
 
         is BranchChangesProjectService.UiState.Unavailable -> BranchChangesBundle.message(
