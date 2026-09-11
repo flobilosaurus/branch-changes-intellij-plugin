@@ -117,6 +117,21 @@ class BranchChangesUiPlatformTest : GitPlatformTestCase() {
         assertEquals("refs/remotes/origin/main", settings.getBase(fixture.root.url, "main"))
     }
 
+    fun testWidgetInitializationOffEdtDefersActiveEditorLookup() {
+        val fixture = createGitRoot("repo")
+        registerGitRoots(fixture.root)
+        manager!!.openFile(fixture.file, true)
+
+        val widget = PlatformTestUtil.callOnBgtSynchronously(
+            { BranchChangesStatusBarWidget(project) },
+            10,
+        )!!
+        Disposer.register(testRootDisposable, widget)
+        PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue()
+
+        assertEquals("Branch Changes: Select base", widget.getSelectedValue())
+    }
+
     fun testWidgetDisposalDetachesPresentation() {
         val widget = BranchChangesStatusBarWidget(project)
         widget.dispose()

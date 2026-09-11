@@ -30,7 +30,7 @@ kotlin {
 
 dependencies {
     intellijPlatform {
-        intellijIdeaCommunity("2024.3")
+        intellijIdeaCommunity("2024.3.7.1")
         bundledPlugin("Git4Idea")
         testFramework(TestFrameworkType.Platform)
         pluginVerifier("1.410")

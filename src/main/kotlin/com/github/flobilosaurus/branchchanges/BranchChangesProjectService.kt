@@ -59,6 +59,9 @@ class BranchChangesProjectService(
     private val invalidBases = ConcurrentHashMap<MappingKey, String>()
 
     @Volatile
+    private var currentFileSnapshot: VirtualFile? = null
+
+    @Volatile
     internal var disposed: Boolean = false
         private set
 
@@ -125,8 +128,14 @@ class BranchChangesProjectService(
 
     fun isEnabled(): Boolean = settings.isEnabled()
 
-    fun currentFile(): VirtualFile? =
-        if (project.isDisposed) null else FileEditorManagerEx.getInstanceEx(project).currentFile
+    fun currentFile(): VirtualFile? {
+        if (project.isDisposed) return null
+        if (!ApplicationManager.getApplication().isDispatchThread) return currentFileSnapshot
+
+        return FileEditorManagerEx.getInstanceEx(project).currentFile.also {
+            currentFileSnapshot = it
+        }
+    }
 
     fun displayRef(ref: String): String = when {
         ref.startsWith("refs/remotes/") -> ref.removePrefix("refs/remotes/")
@@ -134,12 +143,20 @@ class BranchChangesProjectService(
         else -> ref
     }
 
-    fun refresh(@Suppress("UNUSED_PARAMETER") cause: String) {
+    fun refresh(cause: String) {
         if (project.isDisposed) return
+        if (!ApplicationManager.getApplication().isDispatchThread) {
+            ApplicationManager.getApplication().invokeLater({
+                refresh(cause)
+            }, ModalityState.nonModal())
+            return
+        }
+
         val generation = validationGeneration.incrementAndGet()
+        val file = currentFile()
         publishUiUpdate()
 
-        val state = uiState()
+        val state = uiState(file)
         if (state is UiState.Base) {
             validateConfiguredBase(state.context, state.baseRef, generation)
         }
@@ -180,6 +197,7 @@ class BranchChangesProjectService(
     override fun dispose() {
         disposed = true
         validationGeneration.incrementAndGet()
+        currentFileSnapshot = null
         invalidBases.clear()
     }
 

@@ -433,6 +433,8 @@ Complete chosen MVP semantics by resolving committed/staged renames, making gutt
 
 - IntelliJ Platform Gradle Plugin 2.18.1 reports its generic recommendation to remove `until-build`; retained intentional `262.*` bound required by this approved plan. Project configuration and structure checks pass.
 - Phase 1 targets IDEA Community 2024.3 (build line 243) and records IDEA 2026.2.2 (build line 262) as current validated maximum pending Phase 3 Plugin Verifier execution.
+- Phase 1 manual run found status-bar widgets may be constructed off EDT. Active-editor lookup now uses an EDT-captured snapshot; refresh requests from background callbacks are deferred to EDT. Regression test covers off-EDT widget construction.
+- Initial IDEA 2024.3 build `243.21565.193` cannot parse Java 25/26 entries now served by JetBrains' live Gradle compatibility matrix and persists the malformed cache. Development/test target moved within the same supported build line to maintenance release 2024.3.7.1 (`243.28141.41`), whose `JavaVersion.parse` supports both values; minimum `since-build=243` and verifier coverage for initial 2024.3 remain unchanged.
 - [ ] During implementation, record user feedback, unexpected IntelliJ/Git4Idea API differences, tested IDE build numbers, verifier findings, performance measurements, and deviations here.
 - [ ] Before marking implementation complete, resolve every recorded deviation by updating implementation or revising and re-approving plan; leave no open decisions.
 
