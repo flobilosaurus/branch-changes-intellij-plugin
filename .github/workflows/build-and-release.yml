@@ -1,0 +1,80 @@
+name: Build and release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Test and package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Test, verify, and package plugin
+        run: ./gradlew test verifyPluginProjectConfiguration verifyPluginStructure buildPlugin --stacktrace
+
+      - name: Upload packaged plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-changes-plugin-${{ github.sha }}
+          path: build/distributions/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download packaged plugin
+        uses: actions/download-artifact@v4
+        with:
+          name: branch-changes-plugin-${{ github.sha }}
+          path: dist
+
+      - name: Verify tag matches plugin version
+        shell: bash
+        run: |
+          shopt -s nullglob
+          version="${GITHUB_REF_NAME#v}"
+          packages=(dist/*-"${version}".zip)
+          if (( ${#packages[@]} != 1 )); then
+            echo "Expected one plugin ZIP for version ${version}; found ${#packages[@]}." >&2
+            ls -la dist >&2
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: >-
+          gh release create "${GITHUB_REF_NAME}"
+          dist/*.zip
+          --verify-tag
+          --generate-notes
+          --title "Branch Changes ${GITHUB_REF_NAME}"

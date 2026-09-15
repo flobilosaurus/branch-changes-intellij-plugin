@@ -1,5 +1,6 @@
 # Branch Changes
 
+[![Build and release](https://github.com/flobilosaurus/branch-changes-intellij-plugin/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/flobilosaurus/branch-changes-intellij-plugin/actions/workflows/build-and-release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Branch Changes is an IntelliJ IDEA plugin for branch-relative editor change highlighting. Each Git root and local branch gets an explicitly selected comparison base and comparison mode. This avoids guessing branch ancestry from Git metadata while supporting both fork-relative and selected-branch-tip comparisons.
@@ -135,6 +136,19 @@ Launch sandbox IntelliJ IDEA 2024.3:
 ```
 
 Build uses Kotlin, Java 21, Gradle Kotlin DSL, IntelliJ Platform Gradle Plugin 2.x, and bundled `Git4Idea` APIs.
+
+## CI and GitHub releases
+
+GitHub Actions runs tests, plugin structure checks, and `buildPlugin` for every pull request and push to `main`. Packaged ZIPs are retained as workflow artifacts for 14 days.
+
+To publish a GitHub Release, first set matching versions in `build.gradle.kts` and `gradle.properties`, commit them, then push a version tag:
+
+```shell
+git tag v0.4.0
+git push origin v0.4.0
+```
+
+The workflow rejects tags that do not match the packaged plugin version. A successful version-tag build creates a GitHub Release with generated notes and attaches the installable ZIP from `build/distributions/`.
 
 ## Troubleshooting unavailable states
 
