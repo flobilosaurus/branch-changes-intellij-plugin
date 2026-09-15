@@ -4,6 +4,7 @@ import com.github.flobilosaurus.branchchanges.GitPlatformTestCase
 import com.github.flobilosaurus.branchchanges.diff.BranchLineComparator
 import com.github.flobilosaurus.branchchanges.diff.LineComparisonResult
 import com.github.flobilosaurus.branchchanges.model.BranchChangeType
+import com.github.flobilosaurus.branchchanges.model.ComparisonMode
 import com.github.flobilosaurus.branchchanges.model.ComparisonUnavailableReason
 import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.testFramework.PlatformTestUtil
@@ -22,16 +23,16 @@ class BranchGitClientIntegrationTest : GitPlatformTestCase() {
         val repository = registerGitRoots(fixture.root).single()
         val client = BranchGitClient(project)
 
-        val captured = background { client.capture(repository, "refs/heads/main") }
+        val captured = background { client.capture(repository, "refs/heads/main", ComparisonMode.FORK_POINT) }
         assertInstanceOf(captured, GitOperationResult.Success::class.java)
         val identity = (captured as GitOperationResult.Success).value
         assertEquals(git(fixture.root, "rev-parse", "main"), identity.baseTipHash)
         assertEquals(git(fixture.root, "rev-parse", "HEAD"), identity.headHash)
-        assertEquals(identity.baseTipHash, identity.forkHash)
+        assertEquals(identity.baseTipHash, identity.baselineHash)
         assertEquals(64, identity.indexFingerprint.length)
 
         val baseline = background {
-            client.loadBaseline(repository, identity.forkHash, "readme.txt", StandardCharsets.UTF_8)
+            client.loadBaseline(repository, identity.baselineHash, "readme.txt", StandardCharsets.UTF_8)
         }
         assertInstanceOf(baseline, GitOperationResult.Success::class.java)
         assertEquals("initial\n", (baseline as GitOperationResult.Success).value.text)
@@ -69,19 +70,19 @@ class BranchGitClientIntegrationTest : GitPlatformTestCase() {
             if (commitRename) git(fixture.root, "commit", "-m", "rename")
             val repository = registerGitRoots(fixture.root).last()
             val client = BranchGitClient(project)
-            val identity = (background { client.capture(repository, "refs/heads/main") } as GitOperationResult.Success).value
-            val records = (background { client.loadNameStatus(repository, identity.forkHash) } as GitOperationResult.Success).value
+            val identity = (background { client.capture(repository, "refs/heads/main", ComparisonMode.FORK_POINT) } as GitOperationResult.Success).value
+            val records = (background { client.loadNameStatus(repository, identity.baselineHash) } as GitOperationResult.Success).value
             assertEquals(NameStatusKind.RENAMED, records.single { it.path == "renamed.txt" }.kind)
             val resolved = BaselinePathResolver(client).resolve(
                 repository,
                 fixture.root.url,
-                identity.forkHash,
+                identity.baselineHash,
                 identity.indexFingerprint,
                 "renamed.txt",
             ) as BaselinePathResult.Success
             assertEquals("readme.txt", resolved.baselinePath)
             val baseline = background {
-                client.loadBaseline(repository, identity.forkHash, resolved.baselinePath, StandardCharsets.UTF_8)
+                client.loadBaseline(repository, identity.baselineHash, resolved.baselinePath, StandardCharsets.UTF_8)
             } as GitOperationResult.Success
             val compared = BranchLineComparator().compare(
                 baseline.value.text,
@@ -105,13 +106,13 @@ class BranchGitClientIntegrationTest : GitPlatformTestCase() {
         git(fixture.root, "add", "renamed.txt")
         val repository = registerGitRoots(fixture.root).single()
         val client = BranchGitClient(project)
-        val identity = (background { client.capture(repository, "refs/heads/main") } as GitOperationResult.Success).value
+        val identity = (background { client.capture(repository, "refs/heads/main", ComparisonMode.FORK_POINT) } as GitOperationResult.Success).value
         val resolved = BaselinePathResolver(client).resolve(
-            repository, fixture.root.url, identity.forkHash, identity.indexFingerprint, "renamed.txt",
+            repository, fixture.root.url, identity.baselineHash, identity.indexFingerprint, "renamed.txt",
         ) as BaselinePathResult.Success
         assertEquals("readme.txt", resolved.baselinePath)
         val baseline = background {
-            client.loadBaseline(repository, identity.forkHash, resolved.baselinePath, StandardCharsets.UTF_8)
+            client.loadBaseline(repository, identity.baselineHash, resolved.baselinePath, StandardCharsets.UTF_8)
         } as GitOperationResult.Success
         val regions = (BranchLineComparator().compare(
             baseline.value.text,
@@ -122,13 +123,13 @@ class BranchGitClientIntegrationTest : GitPlatformTestCase() {
 
         Files.writeString(Path.of(fixture.root.path, "renamed.txt"), "completely unrelated content\n")
         git(fixture.root, "add", "renamed.txt")
-        val changedIndex = (background { client.capture(repository, "refs/heads/main") } as GitOperationResult.Success).value
+        val changedIndex = (background { client.capture(repository, "refs/heads/main", ComparisonMode.FORK_POINT) } as GitOperationResult.Success).value
         val fallback = BaselinePathResolver(client).resolve(
-            repository, fixture.root.url, changedIndex.forkHash, changedIndex.indexFingerprint, "renamed.txt",
+            repository, fixture.root.url, changedIndex.baselineHash, changedIndex.indexFingerprint, "renamed.txt",
         ) as BaselinePathResult.Success
         assertEquals("renamed.txt", fallback.baselinePath)
         val empty = background {
-            client.loadBaseline(repository, changedIndex.forkHash, fallback.baselinePath, StandardCharsets.UTF_8)
+            client.loadBaseline(repository, changedIndex.baselineHash, fallback.baselinePath, StandardCharsets.UTF_8)
         } as GitOperationResult.Success
         assertTrue(empty.value.isNewFile)
     }
@@ -139,13 +140,13 @@ class BranchGitClientIntegrationTest : GitPlatformTestCase() {
         Files.move(Path.of(fixture.file.path), Path.of(fixture.root.path, "moved.txt"))
         val repository = registerGitRoots(fixture.root).single()
         val client = BranchGitClient(project)
-        val identity = (background { client.capture(repository, "refs/heads/main") } as GitOperationResult.Success).value
+        val identity = (background { client.capture(repository, "refs/heads/main", ComparisonMode.FORK_POINT) } as GitOperationResult.Success).value
         val resolved = BaselinePathResolver(client).resolve(
-            repository, fixture.root.url, identity.forkHash, identity.indexFingerprint, "moved.txt",
+            repository, fixture.root.url, identity.baselineHash, identity.indexFingerprint, "moved.txt",
         ) as BaselinePathResult.Success
         assertEquals("moved.txt", resolved.baselinePath)
         val baseline = background {
-            client.loadBaseline(repository, identity.forkHash, resolved.baselinePath, StandardCharsets.UTF_8)
+            client.loadBaseline(repository, identity.baselineHash, resolved.baselinePath, StandardCharsets.UTF_8)
         } as GitOperationResult.Success
         assertTrue(baseline.value.isNewFile)
         val regions = (BranchLineComparator().compare(
@@ -156,13 +157,78 @@ class BranchGitClientIntegrationTest : GitPlatformTestCase() {
         assertEquals(BranchChangeType.ADDED, regions.single().type)
     }
 
+    fun testDivergentModesUseMergeBaseVersusSelectedBranchTipForBlobAndRenameLookup() {
+        val fixture = createGitRoot("repo")
+        git(fixture.root, "checkout", "-b", "feature")
+        Files.writeString(Path.of(fixture.file.path), "feature content\n")
+        git(fixture.root, "add", "readme.txt")
+        git(fixture.root, "commit", "-m", "feature")
+        git(fixture.root, "checkout", "main")
+        Files.writeString(Path.of(fixture.file.path), "main advanced\n")
+        git(fixture.root, "add", "readme.txt")
+        git(fixture.root, "commit", "-m", "main advance")
+        git(fixture.root, "checkout", "feature")
+        val repository = registerGitRoots(fixture.root).single()
+        val client = BranchGitClient(project)
+
+        val fork = (background {
+            client.capture(repository, "refs/heads/main", ComparisonMode.FORK_POINT)
+        } as GitOperationResult.Success).value
+        val branchHead = (background {
+            client.capture(repository, "refs/heads/main", ComparisonMode.BRANCH_HEAD)
+        } as GitOperationResult.Success).value
+
+        assertFalse(fork.baselineHash == branchHead.baselineHash)
+        assertEquals(fork.baseTipHash, branchHead.baselineHash)
+        val forkBlob = background {
+            client.loadBaseline(repository, fork.baselineHash, "readme.txt", StandardCharsets.UTF_8)
+        } as GitOperationResult.Success
+        val branchHeadBlob = background {
+            client.loadBaseline(repository, branchHead.baselineHash, "readme.txt", StandardCharsets.UTF_8)
+        } as GitOperationResult.Success
+        assertEquals("initial\n", forkBlob.value.text)
+        assertEquals("main advanced\n", branchHeadBlob.value.text)
+
+        assertInstanceOf(
+            background { client.loadNameStatus(repository, fork.baselineHash) },
+            GitOperationResult.Success::class.java,
+        )
+        assertInstanceOf(
+            background { client.loadNameStatus(repository, branchHead.baselineHash) },
+            GitOperationResult.Success::class.java,
+        )
+    }
+
+    fun testAdvancingSelectedRefChangesBranchHeadBaseline() {
+        val fixture = createGitRoot("repo")
+        git(fixture.root, "checkout", "-b", "feature")
+        val repository = registerGitRoots(fixture.root).single()
+        val client = BranchGitClient(project)
+        val first = (background {
+            client.capture(repository, "refs/heads/main", ComparisonMode.BRANCH_HEAD)
+        } as GitOperationResult.Success).value
+
+        git(fixture.root, "checkout", "main")
+        Files.writeString(Path.of(fixture.file.path), "advanced\n")
+        git(fixture.root, "add", "readme.txt")
+        git(fixture.root, "commit", "-m", "advance base")
+        git(fixture.root, "checkout", "feature")
+        val updated = refreshRepository(fixture.root)
+        val second = (background {
+            client.capture(updated, "refs/heads/main", ComparisonMode.BRANCH_HEAD)
+        } as GitOperationResult.Success).value
+
+        assertFalse(first.baselineHash == second.baselineHash)
+        assertEquals(git(fixture.root, "rev-parse", "main"), second.baselineHash)
+    }
+
     fun testMissingBaseAndUnrelatedHistoryAreUnavailable() {
         val fixture = createGitRoot("repo")
         val repository = registerGitRoots(fixture.root).single()
         val client = BranchGitClient(project)
         assertEquals(
             ComparisonUnavailableReason.INVALID_BASE,
-            (background { client.capture(repository, "refs/heads/missing") } as GitOperationResult.Unavailable).reason,
+            (background { client.capture(repository, "refs/heads/missing", ComparisonMode.FORK_POINT) } as GitOperationResult.Unavailable).reason,
         )
 
         git(fixture.root, "checkout", "--orphan", "isolated")
@@ -173,8 +239,12 @@ class BranchGitClientIntegrationTest : GitPlatformTestCase() {
         val updated = refreshRepository(fixture.root)
         assertEquals(
             ComparisonUnavailableReason.NO_MERGE_BASE,
-            (background { client.capture(updated, "refs/heads/main") } as GitOperationResult.Unavailable).reason,
+            (background { client.capture(updated, "refs/heads/main", ComparisonMode.FORK_POINT) } as GitOperationResult.Unavailable).reason,
         )
+        val branchHead = background {
+            client.capture(updated, "refs/heads/main", ComparisonMode.BRANCH_HEAD)
+        } as GitOperationResult.Success
+        assertEquals(git(fixture.root, "rev-parse", "main"), branchHead.value.baselineHash)
     }
 
     fun testMultipleBestMergeBasesAreRejected() {
@@ -190,12 +260,16 @@ class BranchGitClientIntegrationTest : GitPlatformTestCase() {
         val repository = registerGitRoots(fixture.root).single()
         val client = BranchGitClient(project)
 
-        val result = background { client.capture(repository, "refs/heads/base") }
+        val result = background { client.capture(repository, "refs/heads/base", ComparisonMode.FORK_POINT) }
 
         assertEquals(
             ComparisonUnavailableReason.MULTIPLE_MERGE_BASES,
             (result as GitOperationResult.Unavailable).reason,
         )
+        val branchHead = background {
+            client.capture(repository, "refs/heads/base", ComparisonMode.BRANCH_HEAD)
+        } as GitOperationResult.Success
+        assertEquals(a2, branchHead.value.baselineHash)
     }
 
     fun testMissingBaselineObjectDoesNotBecomeNewFile() {

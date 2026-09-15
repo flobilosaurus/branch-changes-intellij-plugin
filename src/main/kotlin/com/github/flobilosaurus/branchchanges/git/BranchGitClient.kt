@@ -1,6 +1,7 @@
 package com.github.flobilosaurus.branchchanges.git
 
 import com.github.flobilosaurus.branchchanges.model.ComparisonLimits
+import com.github.flobilosaurus.branchchanges.model.ComparisonMode
 import com.github.flobilosaurus.branchchanges.model.ComparisonUnavailableReason
 import com.github.flobilosaurus.branchchanges.model.normalizedLineCount
 import com.intellij.openapi.diagnostic.Logger
@@ -21,25 +22,29 @@ import java.nio.file.Path
 import java.security.MessageDigest
 
 interface BranchGitOperations {
-    fun capture(repository: GitRepository, baseRef: String): GitOperationResult<CapturedGitIdentity>
+    fun capture(
+        repository: GitRepository,
+        baseRef: String,
+        mode: ComparisonMode,
+    ): GitOperationResult<CapturedGitIdentity>
 
     fun loadBaseline(
         repository: GitRepository,
-        forkHash: String,
+        baselineHash: String,
         relativePath: String,
         charset: Charset,
     ): GitOperationResult<BaselineContent>
 
     fun indexFingerprint(repository: GitRepository): GitOperationResult<String>
 
-    fun loadNameStatus(repository: GitRepository, forkHash: String): GitOperationResult<List<NameStatusRecord>> =
+    fun loadNameStatus(repository: GitRepository, baselineHash: String): GitOperationResult<List<NameStatusRecord>> =
         GitOperationResult.Success(emptyList())
 }
 
 data class CapturedGitIdentity(
     val baseTipHash: String,
     val headHash: String,
-    val forkHash: String,
+    val baselineHash: String,
     val indexFingerprint: String,
 )
 
@@ -67,6 +72,7 @@ class BranchGitClient(
     override fun capture(
         repository: GitRepository,
         baseRef: String,
+        mode: ComparisonMode,
     ): GitOperationResult<CapturedGitIdentity> {
         checkCancelled()
         val baseTip = resolveCommit(repository, baseRef)
@@ -78,41 +84,46 @@ class BranchGitClient(
             is GitOperationResult.Unavailable -> return fingerprint
         }
 
-        val mergeBase = lineCommand(repository, GitCommand.MERGE_BASE, "--all", baseTip, head)
-        checkCancelled()
-        if (!mergeBase.success()) {
-            return GitOperationResult.Unavailable(
-                ComparisonUnavailableReason.NO_MERGE_BASE,
-                safeError(mergeBase.errorOutputAsJoinedString),
-            )
-        }
-        val hashes = mergeBase.output.map(String::trim).filter(String::isNotEmpty)
-        if (hashes.any { !OBJECT_ID.matches(it) }) {
-            return GitOperationResult.Unavailable(ComparisonUnavailableReason.MALFORMED_GIT_OUTPUT)
-        }
-        when (hashes.size) {
-            0 -> return GitOperationResult.Unavailable(ComparisonUnavailableReason.NO_MERGE_BASE)
-            1 -> Unit
-            else -> return GitOperationResult.Unavailable(ComparisonUnavailableReason.MULTIPLE_MERGE_BASES)
+        val baseline = when (mode) {
+            ComparisonMode.BRANCH_HEAD -> baseTip
+            ComparisonMode.FORK_POINT -> {
+                val mergeBase = lineCommand(repository, GitCommand.MERGE_BASE, "--all", baseTip, head)
+                checkCancelled()
+                if (!mergeBase.success()) {
+                    return GitOperationResult.Unavailable(
+                        ComparisonUnavailableReason.NO_MERGE_BASE,
+                        safeError(mergeBase.errorOutputAsJoinedString),
+                    )
+                }
+                val hashes = mergeBase.output.map(String::trim).filter(String::isNotEmpty)
+                if (hashes.any { !OBJECT_ID.matches(it) }) {
+                    return GitOperationResult.Unavailable(ComparisonUnavailableReason.MALFORMED_GIT_OUTPUT)
+                }
+                when (hashes.size) {
+                    0 -> return GitOperationResult.Unavailable(ComparisonUnavailableReason.NO_MERGE_BASE)
+                    1 -> hashes.single()
+                    else -> return GitOperationResult.Unavailable(ComparisonUnavailableReason.MULTIPLE_MERGE_BASES)
+                }
+            }
         }
         checkCancelled()
         return GitOperationResult.Success(
-            CapturedGitIdentity(baseTip, head, hashes.single(), index),
+            CapturedGitIdentity(baseTip, head, baseline, index),
         )
     }
 
     override fun loadBaseline(
         repository: GitRepository,
-        forkHash: String,
+        baselineHash: String,
         relativePath: String,
         charset: Charset,
     ): GitOperationResult<BaselineContent> {
         checkCancelled()
-        if (!OBJECT_ID.matches(forkHash) || relativePath.isBlank()) {
+        if (!OBJECT_ID.matches(baselineHash) || relativePath.isBlank()) {
             return GitOperationResult.Unavailable(ComparisonUnavailableReason.MALFORMED_GIT_OUTPUT)
         }
 
-        val objectSpec = "$forkHash:$relativePath"
+        val objectSpec = "$baselineHash:$relativePath"
         val exists = lineCommand(repository, GitCommand.CAT_FILE, "-e", objectSpec)
         checkCancelled()
         if (!exists.success()) {
@@ -122,7 +133,7 @@ class BranchGitClient(
                 "--name-only",
                 "-z",
                 "--full-tree",
-                forkHash,
+                baselineHash,
                 "--",
                 relativePath,
             )
@@ -188,9 +199,9 @@ class BranchGitClient(
 
     override fun loadNameStatus(
         repository: GitRepository,
-        forkHash: String,
+        baselineHash: String,
     ): GitOperationResult<List<NameStatusRecord>> {
-        if (!OBJECT_ID.matches(forkHash)) {
+        if (!OBJECT_ID.matches(baselineHash)) {
             return GitOperationResult.Unavailable(ComparisonUnavailableReason.MALFORMED_GIT_OUTPUT)
         }
         return try {
@@ -201,7 +212,7 @@ class BranchGitClient(
                 "--name-status",
                 "-z",
                 "-M",
-                forkHash,
+                baselineHash,
                 "--",
             )
             if (output.size > MAX_NAME_STATUS_BYTES) {

@@ -4,15 +4,17 @@
     <vendor url="https://github.com/flobilosaurus">flobilosaurus</vendor>
 
     <description><![CDATA[
-        Highlights added, modified, and deleted editor lines since the fork point with an explicitly selected branch base.
+        Highlights added, modified, and deleted editor lines against an explicitly selected branch base.
+        Choose a continuously recomputed Fork point or compare directly with the locally known Branch HEAD.
         Includes committed, staged, unstaged, and unsaved changes, supports Git-detected committed/staged renames,
-        and opens fork-to-live full-file diffs from gutter markers. Base mappings stay workspace-local;
+        and opens baseline-to-live full-file diffs from gutter markers. Base and mode mappings stay workspace-local;
         Git operations remain local, read-only, and never fetch.
     ]]></description>
 
     <change-notes><![CDATA[
-        <p>Initial MVP: branch-specific base selection, live fork-relative markers, rename-aware baselines,
-        full-file marker diff, project controls, theme-aware colors, and local-only read-only Git behavior.</p>
+        <p>Adds persisted, branch-specific Fork point and Branch HEAD comparison modes, mode icons and popup actions,
+        mode-aware rename baselines, marker tooltips, and full-file diffs. Git behavior remains local-only, read-only,
+        and no-fetch.</p>
     ]]></change-notes>
 
     <idea-version since-build="243" until-build="262.*"/>

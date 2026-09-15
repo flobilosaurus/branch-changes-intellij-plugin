@@ -6,6 +6,16 @@ enum class BranchChangeType {
     DELETED,
 }
 
+data class BranchChangedSpan(
+    val currentStartOffset: Int,
+    val currentEndOffset: Int,
+) {
+    init {
+        require(currentStartOffset >= 0)
+        require(currentEndOffset > currentStartOffset)
+    }
+}
+
 /** Half-open baseline/current line ranges. Deleted regions use an empty current range and [anchorLine]. */
 data class BranchChangeRegion(
     val type: BranchChangeType,
@@ -14,6 +24,7 @@ data class BranchChangeRegion(
     val currentStartLine: Int,
     val currentEndLine: Int,
     val anchorLine: Int = currentStartLine,
+    val changedSpans: List<BranchChangedSpan> = emptyList(),
 ) {
     init {
         require(baselineStartLine >= 0 && baselineEndLine >= baselineStartLine)
@@ -21,5 +32,6 @@ data class BranchChangeRegion(
         require(anchorLine >= 0)
         require(type == BranchChangeType.DELETED || currentStartLine < currentEndLine)
         require(type != BranchChangeType.DELETED || currentStartLine == currentEndLine)
+        require(type == BranchChangeType.MODIFIED || changedSpans.isEmpty())
     }
 }

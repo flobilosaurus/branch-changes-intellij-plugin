@@ -1,5 +1,6 @@
 package com.github.flobilosaurus.branchchanges.git
 
+import com.github.flobilosaurus.branchchanges.model.ComparisonMode
 import git4idea.repo.GitRepository
 import java.lang.reflect.Proxy
 import java.nio.charset.Charset
@@ -54,10 +55,10 @@ class BaselinePathResolverTest : TestCase() {
     private class FakeGit(private val records: List<NameStatusRecord>) : BranchGitOperations {
         val calls = AtomicInteger()
 
-        override fun capture(repository: GitRepository, baseRef: String) = error("unused")
-        override fun loadBaseline(repository: GitRepository, forkHash: String, relativePath: String, charset: Charset) = error("unused")
+        override fun capture(repository: GitRepository, baseRef: String, mode: ComparisonMode) = error("unused")
+        override fun loadBaseline(repository: GitRepository, baselineHash: String, relativePath: String, charset: Charset) = error("unused")
         override fun indexFingerprint(repository: GitRepository) = error("unused")
-        override fun loadNameStatus(repository: GitRepository, forkHash: String): GitOperationResult<List<NameStatusRecord>> {
+        override fun loadNameStatus(repository: GitRepository, baselineHash: String): GitOperationResult<List<NameStatusRecord>> {
             calls.incrementAndGet()
             return GitOperationResult.Success(records)
         }

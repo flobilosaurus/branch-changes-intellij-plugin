@@ -7,6 +7,7 @@ import com.intellij.openapi.editor.markup.ActiveGutterRenderer
 import com.intellij.util.ui.JBUI
 import java.awt.Color
 import java.awt.Graphics
+import java.awt.Point
 import java.awt.Polygon
 import java.awt.Rectangle
 import java.awt.event.MouseEvent
@@ -15,7 +16,7 @@ class BranchGutterRenderer(
     private val type: BranchChangeType,
     private val colorKey: TextAttributesKey,
     private val tooltip: String,
-    private val action: ((Editor) -> Unit)? = null,
+    private val action: ((Editor, Int) -> Unit)? = null,
 ) : ActiveGutterRenderer {
     override fun paint(editor: Editor, graphics: Graphics, rectangle: Rectangle) {
         graphics.color = markerColor(editor)
@@ -45,7 +46,12 @@ class BranchGutterRenderer(
     override fun canDoAction(editor: Editor, event: MouseEvent): Boolean = action != null && !editor.isDisposed
 
     override fun doAction(editor: Editor, event: MouseEvent) {
-        if (!editor.isDisposed) action?.invoke(editor)
+        if (!editor.isDisposed) {
+            event.consume()
+            val line = editor.xyToLogicalPosition(Point(0, event.y)).line
+                .coerceIn(0, editor.document.lineCount - 1)
+            action?.invoke(editor, line)
+        }
     }
 
     private fun markerColor(editor: Editor): Color {

@@ -11,4 +11,5 @@ data class BranchContext(
     val branchName: String,
     val headHash: String,
     val configuredBaseRef: String?,
+    val comparisonMode: ComparisonMode,
 )

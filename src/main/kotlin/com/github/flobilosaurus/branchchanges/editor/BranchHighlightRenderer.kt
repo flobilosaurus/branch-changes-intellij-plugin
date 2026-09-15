@@ -6,18 +6,21 @@ import com.github.flobilosaurus.branchchanges.model.BranchChangeType
 import com.github.flobilosaurus.branchchanges.model.ComparisonSnapshot
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.editor.markup.HighlighterLayer
 import com.intellij.openapi.editor.markup.HighlighterTargetArea
 import com.intellij.openapi.editor.markup.RangeHighlighter
+import com.intellij.openapi.editor.markup.TextAttributes
+import com.intellij.ui.ColorUtil
 import java.util.IdentityHashMap
 
 class BranchHighlightRenderer {
     private val owned = IdentityHashMap<Editor, List<RangeHighlighter>>()
 
-    fun replace(editor: Editor, snapshot: ComparisonSnapshot, onClick: ((Editor) -> Unit)? = null) {
+    fun replace(editor: Editor, snapshot: ComparisonSnapshot, onClick: ((Editor, Int) -> Unit)? = null) {
         ApplicationManager.getApplication().assertIsDispatchThread()
         if (editor.isDisposed) return
-        val created = snapshot.regions.mapNotNull { region -> create(editor, snapshot, region, onClick) }
+        val created = snapshot.regions.flatMap { region -> create(editor, snapshot, region, onClick) }
         val previous = owned.put(editor, created).orEmpty()
         previous.forEach { if (it.isValid) editor.markupModel.removeHighlighter(it) }
     }
@@ -42,8 +45,8 @@ class BranchHighlightRenderer {
         editor: Editor,
         snapshot: ComparisonSnapshot,
         region: BranchChangeRegion,
-        onClick: ((Editor) -> Unit)?,
-    ): RangeHighlighter? {
+        onClick: ((Editor, Int) -> Unit)?,
+    ): List<RangeHighlighter> {
         val document = editor.document
         val lineCount = document.lineCount
         val startOffset: Int
@@ -54,32 +57,59 @@ class BranchHighlightRenderer {
             endOffset = startOffset
             targetArea = HighlighterTargetArea.EXACT_RANGE
         } else {
-            if (region.currentStartLine >= lineCount) return null
+            if (region.currentStartLine >= lineCount) return emptyList()
             startOffset = document.getLineStartOffset(region.currentStartLine)
-            endOffset = if (region.currentEndLine >= lineCount) {
-                document.textLength
-            } else {
-                document.getLineStartOffset(region.currentEndLine)
-            }
+            endOffset = document.getLineEndOffset(region.currentEndLine - 1)
             targetArea = HighlighterTargetArea.LINES_IN_RANGE
         }
         val key = colorKey(region.type)
         val tooltip = BranchChangesBundle.message(
             "marker.tooltip",
             typeText(region.type),
+            snapshot.identity.mode.displayName(),
+            snapshot.identity.baselineHash.take(7),
             displayRef(snapshot.identity.baseRef),
-            snapshot.identity.forkHash.take(7),
         )
-        return editor.markupModel.addRangeHighlighter(
-            key,
+        val lineHighlighter = editor.markupModel.addRangeHighlighter(
             startOffset,
             endOffset,
             HighlighterLayer.ADDITIONAL_SYNTAX + 1,
+            lineAttributes(editor, key),
             targetArea,
         ).also {
             it.lineMarkerRenderer = BranchGutterRenderer(region.type, key, tooltip, onClick)
             it.errorStripeTooltip = tooltip
         }
+        val inlineHighlighters = region.changedSpans.mapNotNull { span ->
+            val spanStart = span.currentStartOffset.coerceIn(0, document.textLength)
+            val spanEnd = span.currentEndOffset.coerceIn(spanStart, document.textLength)
+            if (spanStart == spanEnd) return@mapNotNull null
+            editor.markupModel.addRangeHighlighter(
+                spanStart,
+                spanEnd,
+                HighlighterLayer.ADDITIONAL_SYNTAX + 2,
+                inlineAttributes(editor, key),
+                HighlighterTargetArea.EXACT_RANGE,
+            )
+        }
+        return listOf(lineHighlighter) + inlineHighlighters
+    }
+
+    private fun lineAttributes(editor: Editor, key: TextAttributesKey): TextAttributes {
+        val configured = editor.colorsScheme.getAttributes(key)
+        val strong = configured?.backgroundColor ?: editor.colorsScheme.defaultForeground
+        val light = configured?.foregroundColor
+            ?: ColorUtil.mix(strong, editor.colorsScheme.defaultBackground, 0.6)
+        return TextAttributes().apply {
+            backgroundColor = light
+            errorStripeColor = configured?.errorStripeColor ?: strong
+        }
+    }
+
+    private fun inlineAttributes(editor: Editor, key: TextAttributesKey): TextAttributes {
+        val configured = editor.colorsScheme.getAttributes(key)
+        val strong = configured?.backgroundColor ?: editor.colorsScheme.defaultForeground
+        return TextAttributes().apply { backgroundColor = strong }
     }
 
     private fun colorKey(type: BranchChangeType) = when (type) {

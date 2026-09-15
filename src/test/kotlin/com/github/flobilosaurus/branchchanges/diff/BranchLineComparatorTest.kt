@@ -24,6 +24,7 @@ class BranchLineComparatorTest : BasePlatformTestCase() {
         assertEquals(BranchChangeType.ADDED, insertion.type)
         assertEquals(1, insertion.currentStartLine)
         assertEquals(2, insertion.currentEndLine)
+        assertEmpty(insertion.changedSpans)
 
         val fresh = regions("", "one\ntwo\n").single()
         assertEquals(BranchChangeType.ADDED, fresh.type)
@@ -32,13 +33,22 @@ class BranchLineComparatorTest : BasePlatformTestCase() {
         assertEmpty(regions("", ""))
     }
 
-    fun testReplacementIsModified() {
-        val replacement = regions("one\nold\nthree\n", "one\nnew\nthree\n").single()
+    fun testReplacementIsModifiedWithPreciseCurrentSpans() {
+        val current = "one\nprefix new suffix\nthree\n"
+        val replacement = regions("one\nprefix old suffix\nthree\n", current).single()
         assertEquals(BranchChangeType.MODIFIED, replacement.type)
         assertEquals(1, replacement.baselineStartLine)
         assertEquals(2, replacement.baselineEndLine)
         assertEquals(1, replacement.currentStartLine)
         assertEquals(2, replacement.currentEndLine)
+        assertEquals(listOf("new"), replacement.changedSpans.map { current.substring(it.currentStartOffset, it.currentEndOffset) })
+
+        val characterEdit = "one\nprefix foobaz suffix\nthree\n"
+        val characterReplacement = regions("one\nprefix foobar suffix\nthree\n", characterEdit).single()
+        assertEquals(
+            listOf("foobaz"),
+            characterReplacement.changedSpans.map { characterEdit.substring(it.currentStartOffset, it.currentEndOffset) },
+        )
     }
 
     fun testUnequalReplacementRemainsModifiedBlock() {

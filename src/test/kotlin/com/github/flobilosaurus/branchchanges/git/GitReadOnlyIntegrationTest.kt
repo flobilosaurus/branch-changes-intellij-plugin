@@ -1,6 +1,7 @@
 package com.github.flobilosaurus.branchchanges.git
 
 import com.github.flobilosaurus.branchchanges.GitPlatformTestCase
+import com.github.flobilosaurus.branchchanges.model.ComparisonMode
 import com.intellij.testFramework.PlatformTestUtil
 import git4idea.commands.Git
 import git4idea.commands.GitLineHandler
@@ -48,6 +49,27 @@ class GitReadOnlyIntegrationTest : GitPlatformTestCase() {
         assertEquals(before, snapshot(fixture.root.path))
     }
 
+    fun testBranchHeadCaptureSkipsMergeBaseWhileForkPointUsesAllMergeBases() {
+        val fixture = createGitRoot("repo")
+        git(fixture.root, "checkout", "-b", "feature")
+        val repository = registerGitRoots(fixture.root).single()
+        val commands = mutableListOf<String>()
+        val client = BranchGitClient(project, spyingGit(commands))
+
+        PlatformTestUtil.callOnBgtSynchronously(
+            { client.capture(repository, "refs/heads/main", ComparisonMode.BRANCH_HEAD) },
+            10,
+        )
+        assertTrue(commands.none { it.contains(" merge-base ") })
+
+        commands.clear()
+        PlatformTestUtil.callOnBgtSynchronously(
+            { client.capture(repository, "refs/heads/main", ComparisonMode.FORK_POINT) },
+            10,
+        )
+        assertTrue(commands.any { it.contains(" merge-base ") && it.contains(" --all ") })
+    }
+
     fun testComparisonAndRenameOperationsLeaveRepositoryUnchanged() {
         val fixture = createGitRoot("repo")
         git(fixture.root, "checkout", "-b", "feature")
@@ -56,18 +78,27 @@ class GitReadOnlyIntegrationTest : GitPlatformTestCase() {
         val before = snapshot(fixture.root.path)
         val client = BranchGitClient(project)
 
-        val identity = PlatformTestUtil.callOnBgtSynchronously(
-            { client.capture(repository, "refs/heads/main") },
-            10,
-        ) as GitOperationResult.Success
-        PlatformTestUtil.callOnBgtSynchronously(
-            { client.loadNameStatus(repository, identity.value.forkHash) },
-            10,
-        )
-        PlatformTestUtil.callOnBgtSynchronously(
-            { client.loadBaseline(repository, identity.value.forkHash, "readme.txt", StandardCharsets.UTF_8) },
-            10,
-        )
+        for (mode in ComparisonMode.entries) {
+            val identity = PlatformTestUtil.callOnBgtSynchronously(
+                { client.capture(repository, "refs/heads/main", mode) },
+                10,
+            ) as GitOperationResult.Success
+            PlatformTestUtil.callOnBgtSynchronously(
+                { client.loadNameStatus(repository, identity.value.baselineHash) },
+                10,
+            )
+            PlatformTestUtil.callOnBgtSynchronously(
+                {
+                    client.loadBaseline(
+                        repository,
+                        identity.value.baselineHash,
+                        "readme.txt",
+                        StandardCharsets.UTF_8,
+                    )
+                },
+                10,
+            )
+        }
 
         assertEquals(before, snapshot(fixture.root.path))
     }

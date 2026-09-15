@@ -21,7 +21,7 @@ class BaselinePathResolver(
 ) {
     private data class CacheKey(
         val rootUrl: String,
-        val forkHash: String,
+        val baselineHash: String,
         val indexFingerprint: String,
         val renameThreshold: Int,
     )
@@ -34,13 +34,13 @@ class BaselinePathResolver(
     fun resolve(
         repository: GitRepository,
         rootUrl: String,
-        forkHash: String,
+        baselineHash: String,
         indexFingerprint: String,
         currentPath: String,
         renameThreshold: Int = DEFAULT_RENAME_THRESHOLD,
     ): BaselinePathResult {
-        val key = CacheKey(rootUrl, forkHash, indexFingerprint, renameThreshold)
-        val renameMap = synchronized(cache) { cache[key] } ?: when (val loaded = git.loadNameStatus(repository, forkHash)) {
+        val key = CacheKey(rootUrl, baselineHash, indexFingerprint, renameThreshold)
+        val renameMap = synchronized(cache) { cache[key] } ?: when (val loaded = git.loadNameStatus(repository, baselineHash)) {
             is GitOperationResult.Success -> loaded.value
                 .asSequence()
                 .filter { it.kind == NameStatusKind.RENAMED }

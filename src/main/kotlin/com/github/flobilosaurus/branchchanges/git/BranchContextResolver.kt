@@ -41,6 +41,7 @@ class BranchContextResolver(
         val branch = repository.currentBranch
             ?: return Result.Unavailable(UnavailableReason.NO_LOCAL_BRANCH)
         val rootUrl = BranchBaseSettings.normalizeRootUrl(repository.root.url)
+        val configuration = settings.getConfiguration(rootUrl, branch.name)
 
         return Result.Available(
             BranchContext(
@@ -51,7 +52,8 @@ class BranchContextResolver(
                     ?: return Result.Unavailable(UnavailableReason.NOT_GIT),
                 branchName = branch.name,
                 headHash = revision,
-                configuredBaseRef = settings.getBase(rootUrl, branch.name),
+                configuredBaseRef = configuration?.baseRef,
+                comparisonMode = configuration?.mode ?: com.github.flobilosaurus.branchchanges.model.ComparisonMode.FORK_POINT,
             ),
         )
     }

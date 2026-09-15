@@ -1,5 +1,6 @@
 package com.github.flobilosaurus.branchchanges.diff
 
+import com.github.flobilosaurus.branchchanges.model.BranchChangedSpan
 import com.github.flobilosaurus.branchchanges.model.BranchChangeRegion
 import com.github.flobilosaurus.branchchanges.model.BranchChangeType
 import com.github.flobilosaurus.branchchanges.model.ComparisonLimits
@@ -37,7 +38,7 @@ class BranchLineComparator(
 
         return try {
             indicator.checkCanceled()
-            val fragments = comparisonManager.compareLines(
+            val fragments = comparisonManager.compareLinesInner(
                 baselineText,
                 currentText,
                 ComparisonPolicy.DEFAULT,
@@ -58,6 +59,15 @@ class BranchLineComparator(
             baselineEmpty -> BranchChangeType.ADDED
             else -> BranchChangeType.MODIFIED
         }
+        val changedSpans = if (type == BranchChangeType.MODIFIED) {
+            fragment.innerFragments.orEmpty().mapNotNull { inner ->
+                val start = fragment.startOffset2 + inner.startOffset2
+                val end = fragment.startOffset2 + inner.endOffset2
+                if (start < end) BranchChangedSpan(start, end) else null
+            }
+        } else {
+            emptyList()
+        }
         return BranchChangeRegion(
             type = type,
             baselineStartLine = fragment.startLine1,
@@ -65,6 +75,7 @@ class BranchLineComparator(
             currentStartLine = fragment.startLine2,
             currentEndLine = fragment.endLine2,
             anchorLine = fragment.startLine2,
+            changedSpans = changedSpans,
         )
     }
 }
