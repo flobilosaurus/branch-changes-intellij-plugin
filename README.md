@@ -1,5 +1,7 @@
 # Branch Changes
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Branch Changes is an IntelliJ IDEA plugin for branch-relative editor change highlighting. Each Git root and local branch gets an explicitly selected comparison base and comparison mode. This avoids guessing branch ancestry from Git metadata while supporting both fork-relative and selected-branch-tip comparisons.
 
 > Development status: selectable comparison modes, base selection, live branch-relative markers, rename awareness, and marker-click full diff are implemented.
@@ -63,11 +65,11 @@ Baseline text is compared directly with current live editor document. Both modes
 
 Marker legend:
 
-- **Added** — whole-line added background plus gutter stripe
-- **Modified** — whole-line modified background plus gutter stripe
+- **Added** — light whole-line added background plus gutter stripe
+- **Modified** — light whole-line background, stronger changed-span background, plus gutter stripe
 - **Deleted** — gutter triangle anchored before next live line or at EOF
 
-Colors use theme-aware IntelliJ diff defaults and can be changed under **Settings | Editor | Color Scheme | Branch Changes**. Tooltips and accessibility text identify change type, selected mode, selected base, actual abbreviated baseline commit, and local-edit scope. Click any added, modified, or deleted gutter marker to open full-file diff from mode-selected baseline content to current live document. Diff title and baseline label distinguish `Fork point <commit>` from `Branch HEAD <commit>` and retain old/new paths for renames.
+Colors use theme-aware IntelliJ diff defaults and can be changed under **Settings | Editor | Color Scheme | Branch Changes**. Modified-line highlighting follows IntelliJ diff style: row context stays subtle while changed tokens receive stronger emphasis. Tooltips and accessibility text identify change type, selected mode, selected base, actual abbreviated baseline commit, and local-edit scope. Click any added, modified, or deleted gutter marker to open full-file diff from mode-selected baseline content to current live document. Diff title and baseline label distinguish `Fork point <commit>` from `Branch HEAD <commit>` and retain old/new paths for renames.
 
 Branch Changes markers coexist with IntelliJ built-in VCS gutter markers. Built-in markers remain `HEAD`-relative; Branch Changes markers use selected comparison mode.
 
@@ -137,6 +139,10 @@ Build uses Kotlin, Java 21, Gradle Kotlin DSL, IntelliJ Platform Gradle Plugin 2
 ## Troubleshooting unavailable states
 
 Configuration UI remains inactive for non-Git files, detached HEAD, unborn branches, and repositories without current local branch. Missing saved refs appear unavailable and can be replaced through **Select base...**. Fetch stale refs manually, then wait for repository refresh. Binary, ignored, oversized, excessive-line, and Git failure states apply to both modes. No/multiple merge-base states apply only to Fork point; switch to Branch HEAD if direct selected-tip comparison is desired. States appear as editor notifications or status-widget tooltips without repeated dialogs. Git command failures are available in IDE log; file contents are not logged.
+
+## License
+
+Branch Changes is available under the [MIT License](LICENSE). Bundled third-party icon assets remain covered by their respective notices under [`src/main/resources/META-INF/third-party/`](src/main/resources/META-INF/third-party/).
 
 ## Non-goals
 
