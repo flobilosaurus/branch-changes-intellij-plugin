@@ -10,11 +10,11 @@ Branch Changes is an IntelliJ IDEA plugin for branch-relative editor change high
 ## Requirements
 
 - IntelliJ IDEA Community or Ultimate 2024.3 or newer
-- Validated maximum: IntelliJ IDEA 2026.2.2 (`262.*`)
+- Latest verified IDE: IntelliJ IDEA 2026.3, build `263.7307.200`
 - Git repository with a local branch and at least one commit
 - Java 21 for plugin development
 
-Releases newer than the validated maximum are unsupported until compatibility is verified.
+No upper IDE version limit is declared, so future releases can load the same plugin ZIP without a rebuild solely for a new IDE version number. Compatibility with unverified releases is best effort: IntelliJ Platform or Git4Idea API changes may still require a plugin update.
 
 ## Install from a local ZIP
 
@@ -129,6 +129,20 @@ Run tests and project checks:
 ./gradlew verifyPluginProjectConfiguration verifyPluginStructure
 ```
 
+Verify binary compatibility with the configured IDE versions (2024.3, 2026.2.2, and 2026.3 EAP):
+
+```shell
+./gradlew verifyPlugin
+```
+
+The 2026.3 EAP verification target is pinned in `gradle.properties`. To check only an installed IDE instead of downloading the configured targets:
+
+```shell
+./gradlew verifyPlugin -PverificationIdePath="/Applications/IntelliJ IDEA.app"
+```
+
+Verification uses each target IDE's bundled JetBrains Runtime, including Java 25 for 2026.3. Plugin compilation still targets Java 21 and IntelliJ IDEA 2024.3 to preserve older IDE support. An optional dependency on the VCS plugin extracted in 2026.3 keeps DVCS APIs accessible without requiring that plugin on older IDEs.
+
 Launch sandbox IntelliJ IDEA 2024.3:
 
 ```shell
@@ -141,11 +155,11 @@ Build uses Kotlin, Java 21, Gradle Kotlin DSL, IntelliJ Platform Gradle Plugin 2
 
 GitHub Actions runs tests, plugin structure checks, and `buildPlugin` for every pull request and push to `main`. Packaged ZIPs are retained as workflow artifacts for 14 days.
 
-To publish a GitHub Release, first set matching versions in `build.gradle.kts` and `gradle.properties`, commit them, then push a version tag:
+To publish a GitHub Release, first set `pluginVersion` in `gradle.properties`, commit it, then push a matching version tag:
 
 ```shell
-git tag v0.4.0
-git push origin v0.4.0
+git tag v0.4.1
+git push origin v0.4.1
 ```
 
 The workflow rejects tags that do not match the packaged plugin version. A successful version-tag build creates a GitHub Release with generated notes and attaches the installable ZIP from `build/distributions/`.

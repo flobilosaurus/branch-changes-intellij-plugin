@@ -12,15 +12,17 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <p>Adds persisted, branch-specific Fork point and Branch HEAD comparison modes, mode icons and popup actions,
-        mode-aware rename baselines, marker tooltips, and full-file diffs. Git behavior remains local-only, read-only,
-        and no-fetch.</p>
+        <p>Adds IntelliJ IDEA 2026.3 compatibility and removes the upper IDE version limit.
+        IntelliJ IDEA 2024.3 remains the minimum; future versions are allowed on a best-effort basis.
+        Git behavior remains local-only, read-only, and no-fetch.</p>
     ]]></change-notes>
 
-    <idea-version since-build="243" until-build="262.*"/>
+    <idea-version since-build="243"/>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.vcs</depends>
+    <!-- VCS APIs moved to a bundled plugin in 2026.3; older IDEs provide them in the platform. -->
+    <depends optional="true" config-file="vcs-platform.xml">com.intellij.platform.vcs</depends>
     <depends>Git4Idea</depends>
 
     <extensions defaultExtensionNs="com.intellij">

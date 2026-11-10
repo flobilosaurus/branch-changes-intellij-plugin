@@ -8,8 +8,8 @@ plugins {
     id("org.jetbrains.intellij.platform")
 }
 
-group = "com.github.flobilosaurus"
-version = "0.4.0"
+group = providers.gradleProperty("pluginGroup").get()
+version = providers.gradleProperty("pluginVersion").get()
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
@@ -30,10 +30,10 @@ kotlin {
 
 dependencies {
     intellijPlatform {
-        intellijIdeaCommunity("2024.3.7.1")
+        intellijIdeaCommunity(providers.gradleProperty("platformVersion"))
         bundledPlugin("Git4Idea")
         testFramework(TestFrameworkType.Platform)
-        pluginVerifier("1.410")
+        pluginVerifier(providers.gradleProperty("pluginVerifierVersion"))
     }
 
     testImplementation("junit:junit:4.13.2")
@@ -44,16 +44,23 @@ intellijPlatform {
 
     pluginConfiguration {
         ideaVersion {
-            sinceBuild = "243"
-            untilBuild = "262.*"
+            sinceBuild = providers.gradleProperty("pluginSinceBuild")
+            // Disable the Gradle plugin default upper bound as well as the descriptor attribute.
+            untilBuild = provider { null }
         }
     }
 
     pluginVerification {
         ides {
-            create(IntelliJPlatformType.IntellijIdeaCommunity, "2024.3")
-            create(IntelliJPlatformType.IntellijIdeaUltimate, "2024.3")
-            create(IntelliJPlatformType.IntellijIdea, "2026.2.2")
+            val verificationIdePath = providers.gradleProperty("verificationIdePath")
+            if (verificationIdePath.isPresent) {
+                local(file(verificationIdePath.get()))
+            } else {
+                create(IntelliJPlatformType.IntellijIdeaCommunity, "2024.3")
+                create(IntelliJPlatformType.IntellijIdeaUltimate, "2024.3")
+                create(IntelliJPlatformType.IntellijIdea, "2026.2.2")
+                create(IntelliJPlatformType.IntellijIdea, providers.gradleProperty("verificationIdeVersion"))
+            }
         }
     }
 }
